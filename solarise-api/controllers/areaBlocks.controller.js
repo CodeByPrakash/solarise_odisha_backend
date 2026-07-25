@@ -41,7 +41,7 @@ export const updateAreaBlock = async (req, res) => {
         const { id } = req.params;
         const { name, is_active } = req.body;
         const result = await pool.query(
-            "UPDATE area_blocks SET name=$1, is_active=$2, updated_at=now() WHERE id=$3 RETURNING id, name, is_active",
+            "UPDATE area_blocks SET name=$1, is_active=$2 WHERE id=$3 RETURNING id, name, is_active",
             [name, is_active, id]
         );
         if (result.rowCount === 0) {
@@ -49,8 +49,12 @@ export const updateAreaBlock = async (req, res) => {
         }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) {
+        if (err.code === "23505") {
+            return res.status(409).json({ error: "Area block name already exists" });
+        }
         res.status(500).json({ error: err.message });
     }
+
 }
 export const deleteAreaBlock = async (req, res) => {
     try {

@@ -33,6 +33,17 @@ export const getUserById = async (req, res) => {
 export const createUser = async (req, res) => {
     try {
         const { full_name, email, phone, role, password_hash } = req.body;
+        if (!full_name || !email || !phone || !password_hash) {
+            return res.status(400).json({ error: "full_name, email, phone, and password_hash are required" });
+        }
+        // Check if email or phone already exists
+        const existingUser = await pool.query(
+            "SELECT id FROM users WHERE phone = $1",
+            [phone]
+        );
+        if (existingUser.rowCount > 0) {
+            return res.status(409).json({ error: "Phone number already exists" });
+        }
         const result = await pool.query(
             `INSERT INTO users (full_name, email, phone, role, password_hash)
              VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, phone, role`,
