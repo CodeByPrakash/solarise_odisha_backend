@@ -1,0 +1,37 @@
+flowchart LR
+    subgraph AGENT["🧑‍💼 Agent (base view)"]
+        consumers[consumers]
+        bank_loans[bank_loans]
+    end
+    subgraph DOC["📄 Doc Team"]
+        documents[documents]
+        action_required[action_required]
+        ownership_transfers[ownership_transfers]
+    end
+    subgraph SITE["🔧 Site Manager"]
+        material_deliveries[material_deliveries]
+        installation_progress[installation_progress]
+    end
+    subgraph ACC["💰 Accounts"]
+        payments[payments]
+    end
+    subgraph CORE["⚙️ Core / Admin"]
+        users[users]
+        area_blocks[area_blocks]
+        projects[projects]
+        status_history[status_history]
+        notifications[notifications]
+    end
+
+    users -->|creates| consumers
+    area_blocks --> consumers
+    consumers -->|1:1| projects
+    consumers --> bank_loans
+    consumers --> documents
+    projects --> action_required
+    action_required --> ownership_transfers
+    projects --> material_deliveries
+    projects --> installation_progress
+    projects --> payments
+    projects --> status_history
+    projects --> notifications

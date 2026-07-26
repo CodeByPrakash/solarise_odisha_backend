@@ -1,0 +1,29 @@
+erDiagram
+    consumers {
+        bigint id PK
+        text full_name
+    }
+    projects {
+        bigint id PK
+        project_status current_status "the pipeline"
+    }
+    documents {
+        bigint id PK
+        document_type doc_type "aadhaar, PAN, bill, ROR, photos ..."
+        document_status status "uploaded - verified - rejected"
+        int version "re-uploads bump version"
+    }
+    action_required {
+        bigint id PK
+        action_type action_type "name fix, ownership, com-dom, passbook"
+        action_status status "open - resolved"
+    }
+    ownership_transfers {
+        bigint id PK
+        boolean all_ror_members_alive "dead member: +death cert +legal heir"
+        text beneficiary_name
+    }
+    consumers ||--o{ documents : "uploads"
+    consumers ||--|| projects : "has one"
+    projects ||--o{ action_required : "doc team raises"
+    action_required ||--o| ownership_transfers : "case C-1 detail"

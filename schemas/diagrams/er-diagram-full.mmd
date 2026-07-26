@@ -1,0 +1,185 @@
+erDiagram
+    users {
+        bigint id PK
+        text full_name
+        citext email UK
+        varchar_15 phone UK
+        user_role role "agent | site_manager | doc_team | accounts | admin"
+        text password_hash
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    area_blocks {
+        bigint id PK
+        text name UK "e.g. Kalamboli, Dharmasala"
+        boolean is_active
+    }
+
+    consumers {
+        bigint id PK
+        text full_name
+        text address
+        bigint area_block_id FK "-> area_blocks.id"
+        citext email
+        varchar_15 phone_primary
+        varchar_15 phone_secondary
+        text contact_person_name
+        varchar_15 contact_person_phone
+        text contact_person_relation
+        boolean same_as_contact_person
+        text name_on_electric_bill
+        varchar_15 phone_on_electric_bill
+        numeric_9_6 geo_lat
+        numeric_9_6 geo_lng
+        text electric_consumer_no UK
+        smallint age "18..120"
+        boolean surpassed_mac "GENERATED: age > 64 (MAC 65)"
+        char_12 aadhaar_no
+        char_10 pan_no
+        text bank_account_no
+        payment_mode payment_mode "cash | bank_loan"
+        boolean land_owned_by_consumer
+        occupation_type occupation "salaried | businessman | self_employed | farmer | housewife"
+        bigint created_by FK "-> users.id (agent)"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    bank_loans {
+        bigint id PK
+        bigint consumer_id FK, UK "-> consumers.id (1:1)"
+        boolean is_ghanbani_land
+        text bank_name
+        numeric_12_2 loan_amount
+        timestamptz applied_at
+        timestamptz approved_at
+        timestamptz rejected_at
+        text remarks
+    }
+
+    projects {
+        bigint id PK
+        bigint consumer_id FK, UK "-> consumers.id (1:1)"
+        project_status current_status "~40-state pipeline"
+        text registration_no UK
+        numeric_6_2 capacity_kw
+        bigint assigned_site_manager FK "-> users.id"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    documents {
+        bigint id PK
+        bigint consumer_id FK "-> consumers.id"
+        document_type doc_type "electric_bill, aadhaar_card, land_ror, noc, ..."
+        text file_url
+        text file_name
+        text mime_type
+        numeric_9_6 geo_lat "for geo-tagged photos"
+        numeric_9_6 geo_lng
+        document_status status "uploaded | verified | rejected | action_required"
+        bigint uploaded_by FK "-> users.id"
+        timestamptz uploaded_at
+        bigint verified_by FK "-> users.id (doc team)"
+        timestamptz verified_at
+        text reject_reason
+        int version "re-uploads bump version"
+    }
+
+    status_history {
+        bigint id PK
+        bigint project_id FK "-> projects.id"
+        project_status from_status
+        project_status to_status
+        bigint changed_by FK "-> users.id"
+        text remarks
+        timestamptz changed_at
+    }
+
+    action_required {
+        bigint id PK
+        bigint project_id FK "-> projects.id"
+        action_type action_type "name correction | ownership transfer | com->dom | passbook | other"
+        text detail "for name of <text>"
+        action_status status "open | doc_uploaded | in_review | resolved | cancelled"
+        bigint raised_by FK "-> users.id (doc team)"
+        timestamptz raised_at
+        bigint assigned_to FK "-> users.id (agent)"
+        bigint resolved_by FK "-> users.id"
+        timestamptz resolved_at
+    }
+
+    ownership_transfers {
+        bigint id PK
+        bigint action_id FK, UK "-> action_required.id (1:1)"
+        boolean all_ror_members_alive "alive: NOC+Form1+undertaking; dead: +death cert+legal heir"
+        text beneficiary_name
+        text remarks
+    }
+
+    material_deliveries {
+        bigint id PK
+        bigint project_id FK, UK "-> projects.id (1:1)"
+        timestamptz delivered_at
+        text dcr_number
+        bigint recorded_by FK "-> users.id (site manager)"
+    }
+
+    installation_progress {
+        bigint id PK
+        bigint project_id FK "-> projects.id"
+        installation_item item "structure 30, panel 10, inverter 20, ..."
+        smallint weight_pct "weights sum to 100"
+        boolean is_done
+        bigint done_by FK "-> users.id (site manager)"
+        timestamptz done_at
+    }
+
+    payments {
+        bigint id PK
+        bigint project_id FK "-> projects.id"
+        payment_type payment_type "processing_fee | security_deposit | consumer_payment | loan_disbursal | subsidy_cfa | subsidy_sfa"
+        numeric_12_2 amount
+        payment_status status "pending | paid | refunded | failed"
+        text reference_no "UTR / receipt no."
+        timestamptz paid_at
+        bigint recorded_by FK "-> users.id (accounts)"
+        text remarks
+        timestamptz created_at
+    }
+
+    notifications {
+        bigint id PK
+        bigint user_id FK "-> users.id"
+        bigint project_id FK "-> projects.id"
+        text title "Doc uploaded / Action required"
+        text body
+        boolean is_read
+        timestamptz created_at
+    }
+
+    %% ---- relationships ----
+    users        ||--o{ consumers            : "creates (agent)"
+    area_blocks  ||--o{ consumers            : "located in"
+    consumers    ||--o| bank_loans           : "has, if payment_mode = bank_loan"
+    consumers    ||--|| projects             : "has exactly one"
+    consumers    ||--o{ documents            : "owns uploads"
+    users        ||--o{ documents            : "uploaded_by"
+    users        |o--o{ documents            : "verified_by (doc team)"
+    projects     ||--o{ status_history       : "logs transitions"
+    users        ||--o{ status_history       : "changed_by"
+    projects     ||--o{ action_required      : "corrections raised"
+    users        ||--o{ action_required      : "raised_by (doc team)"
+    users        |o--o{ action_required      : "assigned_to (agent)"
+    action_required ||--o| ownership_transfers : "detail, if type = ownership_transfer"
+    projects     ||--o| material_deliveries  : "one delivery record"
+    users        ||--o{ material_deliveries  : "recorded_by (site manager)"
+    projects     ||--o{ installation_progress : "10 weighted checklist items"
+    users        |o--o{ installation_progress : "done_by (site manager)"
+    projects     ||--o{ payments             : "money movements"
+    users        ||--o{ payments             : "recorded_by (accounts)"
+    users        ||--o{ notifications        : "receives"
+    projects     |o--o{ notifications        : "about"
+    users        |o--o{ projects             : "assigned_site_manager"

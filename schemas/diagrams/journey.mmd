@@ -1,0 +1,35 @@
+flowchart TB
+    subgraph S1["1 · AGENT"]
+        direction LR
+        A1["Capture consumer lead"] --> A2["Upload KYC, land,<br/>bank documents"]
+    end
+    subgraph S2["2 · DOC TEAM"]
+        direction LR
+        B1{"Docs OK?"} -- "No → Action Required<br/>(name fix / ownership transfer /<br/>commercial→domestic)" --> B2["Agent re-uploads"]
+        B2 --> B1
+        B1 -- Yes --> B3["Registration:<br/>fee paid → reg. no. → discom →<br/>PSA agreement → PMSGY done"]
+    end
+    subgraph S3["3 · LOAN (only if bank loan)"]
+        direction LR
+        C1["Loan applied"] --> C2["Approved / Rejected"]
+    end
+    subgraph S4["4 · SITE MANAGER"]
+        direction LR
+        D1["Line-up given"] --> D2["Materials delivered<br/>DCR no. + sealing & consent videos"]
+        D2 --> D3["Installation checklist<br/>0 → 100%"]
+        D3 --> D4["5 site photos uploaded"]
+    end
+    subgraph S5["5 · COMMISSIONING"]
+        direction LR
+        E1["Net metering"] --> E2["Inspection report<br/>to discom"] --> E3["Meter installed"] --> E4["Project commissioned"]
+    end
+    subgraph S6["6 · ACCOUNTS"]
+        direction LR
+        F1["Subsidy disbursed<br/>(CFA / SFA)"] --> F2["Project handed over ✅"]
+    end
+    S1 --> S2
+    S2 -- "cash" --> S4
+    S2 -- "bank loan" --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6

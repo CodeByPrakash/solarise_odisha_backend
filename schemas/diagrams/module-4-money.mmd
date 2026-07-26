@@ -1,0 +1,25 @@
+erDiagram
+    projects {
+        bigint id PK
+        project_status current_status
+    }
+    payments {
+        bigint id PK
+        payment_type payment_type "fee, deposit, subsidy CFA / SFA"
+        numeric amount
+        payment_status status "pending - paid"
+    }
+    status_history {
+        bigint id PK
+        project_status from_status
+        project_status to_status
+        timestamptz changed_at "who moved what, when"
+    }
+    notifications {
+        bigint id PK
+        text title "doc uploaded / action required"
+        boolean is_read "powers the x-days-ago feed"
+    }
+    projects ||--o{ payments : "accounts records"
+    projects ||--o{ status_history : "every move logged"
+    projects ||--o{ notifications : "activity feed"

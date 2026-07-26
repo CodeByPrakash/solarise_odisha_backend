@@ -1,0 +1,19 @@
+erDiagram
+    projects {
+        bigint id PK
+        project_status current_status
+        bigint assigned_site_manager FK
+    }
+    material_deliveries {
+        bigint id PK
+        text dcr_number
+        timestamptz delivered_at "sealing + consent videos in documents"
+    }
+    installation_progress {
+        bigint id PK
+        installation_item item "structure, panel, wiring ..."
+        smallint weight_pct "all 10 items sum to 100"
+        boolean is_done "done weights = project %"
+    }
+    projects ||--o| material_deliveries : "one delivery record"
+    projects ||--o{ installation_progress : "10 weighted items"

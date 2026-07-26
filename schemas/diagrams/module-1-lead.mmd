@@ -1,0 +1,28 @@
+erDiagram
+    users {
+        bigint id PK
+        text full_name
+        user_role role "agent is the base role"
+    }
+    area_blocks {
+        bigint id PK
+        text name "Kalamboli, Dharmasala, ..."
+    }
+    consumers {
+        bigint id PK
+        text full_name
+        text electric_consumer_no UK "from electric bill"
+        smallint age "flagged if > 64 (MAC 65)"
+        payment_mode payment_mode "cash or bank_loan"
+        occupation_type occupation "salaried ... housewife"
+        boolean land_owned_by_consumer
+    }
+    bank_loans {
+        bigint id PK
+        boolean is_ghanbani_land
+        numeric loan_amount
+        timestamptz approved_at "applied / approved / rejected"
+    }
+    users ||--o{ consumers : "creates (agent)"
+    area_blocks ||--o{ consumers : "located in"
+    consumers ||--o| bank_loans : "only if payment_mode = bank_loan"

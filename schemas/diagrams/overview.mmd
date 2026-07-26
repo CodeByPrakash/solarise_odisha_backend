@@ -1,0 +1,13 @@
+erDiagram
+    users ||--o{ consumers : "agent creates"
+    area_blocks ||--o{ consumers : "area dropdown"
+    consumers ||--|| projects : "exactly one"
+    consumers ||--o| bank_loans : "only if bank loan"
+    consumers ||--o{ documents : "all uploads"
+    projects ||--o{ action_required : "corrections"
+    action_required ||--o| ownership_transfers : "only if ownership transfer"
+    projects ||--o{ status_history : "audit trail"
+    projects ||--o| material_deliveries : "delivery record"
+    projects ||--o{ installation_progress : "weighted checklist"
+    projects ||--o{ payments : "fees + subsidy"
+    projects ||--o{ notifications : "activity feed"
