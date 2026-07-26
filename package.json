@@ -1,0 +1,8 @@
+{
+    "name": "solarise-odisha-backend",
+    "private": true,
+    "scripts": {
+        "start": "npm --prefix solarise-api start",
+        "dev": "npm --prefix solarise-api run dev"
+    }
+}
