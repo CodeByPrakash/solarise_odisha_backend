@@ -14,6 +14,8 @@ import ownershipTransfersRoutes from "./routes/ownershipTransfers.routes.js";
 import materialDeliveriesRoutes from "./routes/materialDeliveries.routes.js";
 import installationProgressRoutes from "./routes/installationProgress.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
+import notificationRoutes from "./routes/notifications.routes.js";
+import statusHistoryRoutes from "./routes/statusHistory.routes.js";
 const app = express();
 const PORT = process.env.PORT || 'your_port';
 
@@ -34,6 +36,8 @@ app.use("/api/ownership-transfers", ownershipTransfersRoutes);
 app.use("/api/material-deliveries", materialDeliveriesRoutes);
 app.use("/api/installation", installationProgressRoutes);
 app.use("/api/payments", paymentsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/status-history', statusHistoryRoutes);
 
 pool.query("SELECT NOW()", (err, res) => {
     if (err) {
