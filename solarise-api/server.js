@@ -22,9 +22,9 @@ const PORT = process.env.PORT || 'your_port';
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-    res.send("Hello World!");
-});
+// app.get("/", (req, res) => {
+//     res.send("Hello World!");
+// });
 app.use("/api/users", usersRoutes);
 app.use("/api/areaBlocks", areaBlocksRoutes);
 app.use('/api/consumers', consumersRoutes);
