@@ -9,6 +9,7 @@ import {
     updateProject,
     deleteProject,
 } from "../controllers/projects.controller.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -17,11 +18,14 @@ router.get("/dashboard", getProjectsDashboard);         // GET /api/projects/das
 router.get("/status/:status", getProjectsByStatus);     // GET /api/projects/status/:status
 
 // Main CRUD endpoints
-router.get("/", getAllProjects);                         // GET /api/projects
-router.get("/:id", getProjectById);                      // GET /api/projects/:id
-router.post("/", createProject);                         // POST /api/projects
-router.patch("/:id/status", updateProjectStatus);        // PATCH /api/projects/:id/status
-router.put("/:id", updateProject);                       // PUT /api/projects/:id
-router.delete("/:id", deleteProject);                   // DELETE /api/projects/:id
+// require auth for project operations
+router.use(authenticateToken);
+
+router.get("/", getAllProjects);                         // GET /api/projects (authenticated)
+router.get("/:id", getProjectById);                      // GET /api/projects/:id (authenticated)
+router.post("/", authorizeRoles("admin","agent"), createProject);                         // POST /api/projects
+router.patch("/:id/status", authorizeRoles("admin","agent"), updateProjectStatus);        // PATCH /api/projects/:id/status
+router.put("/:id", authorizeRoles("admin","agent"), updateProject);                       // PUT /api/projects/:id
+router.delete("/:id", authorizeRoles("admin","agent"), deleteProject);                   // DELETE /api/projects/:id
 
 export default router;
