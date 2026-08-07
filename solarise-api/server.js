@@ -43,11 +43,15 @@ app.use("/api/payments", paymentsRoutes);
 // Global error handler — must be LAST middleware
 app.use(errorHandler);
 
-pool.query("SELECT NOW()", (err, res) => {
+//fronted api endpoints
+app.use(authenticateToken);
+
+pool.query("SELECT NOW()", (err, result) => {
     if (err) {
-        console.error(err);
+        console.error('DB connection error:', err.message || err);
+    } else {
+        console.log(result.rows);
     }
-    console.log(res.rows);
 });
 
 app.listen(PORT, () => {
