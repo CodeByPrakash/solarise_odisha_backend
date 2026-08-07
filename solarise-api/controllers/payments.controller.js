@@ -64,7 +64,7 @@ export const createPayment = async (req, res) => {
 export const updatePaymentStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, reference_no, paid_at } = req.body;
+        const { status, reference_no, paid_at, remarks } = req.body;
 
         if (!status) {
             return res.status(400).json({ error: "status is required" });
@@ -77,18 +77,20 @@ export const updatePaymentStatus = async (req, res) => {
                 UPDATE payments
                 SET status = $1,
                     reference_no = COALESCE($2, reference_no),
-                    paid_at = COALESCE($3, paid_at, now())
-                WHERE id = $4
+                    paid_at = COALESCE($3, paid_at, now()),
+                    remarks = COALESCE($4, remarks)
+                WHERE id = $5
                 RETURNING *
-            `, [status, reference_no, paid_at, id]);
+            `, [status, reference_no, paid_at, remarks, id]);
         } else {
             result = await pool.query(`
                 UPDATE payments
                 SET status = $1,
-                    reference_no = COALESCE($2, reference_no)
-                WHERE id = $3
+                    reference_no = COALESCE($2, reference_no),
+                    remarks = COALESCE($3, remarks)
+                WHERE id = $4
                 RETURNING *
-            `, [status, reference_no, id]);
+            `, [status, reference_no, remarks, id]);
         }
 
         if (result.rowCount === 0) {

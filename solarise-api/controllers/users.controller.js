@@ -4,7 +4,7 @@ import pool from "../config/db.js";
 export const getAllUsers = async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT id, full_name, email, phone,password_hash, role, is_active, created_at FROM users ORDER BY id"
+            "SELECT id, full_name, email, phone, role, is_active, created_at FROM users ORDER BY id"
         );
         res.status(200).json({ count: result.rowCount, data: result.rows });
     } catch (err) {
@@ -17,7 +17,7 @@ export const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = $1",
+            "SELECT id, full_name, email, phone,password_hash, role, is_active, created_at FROM users WHERE id = $1",
             [id]
         );
         if (result.rowCount === 0) {

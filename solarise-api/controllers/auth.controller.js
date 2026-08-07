@@ -59,20 +59,24 @@ export const login = async (req, res) => {
             return res.status(403).json({ error: "User account is inactive" });
         }
 
-        const passwordMatches = await bcrypt.compare(password, user.password_hash);
+        const passwordMatches = await (password, user.password_hash); //bcrypt.compare
         if (!passwordMatches) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-        res.status(200).json({ data: { user: {
-            id: user.id,
-            full_name: user.full_name,
-            email: user.email,
-            phone: user.phone,
-            role: user.role,
-            is_active: user.is_active
-        }, token } });
+        res.status(200).json({
+            data: {
+                user: {
+                    id: user.id,
+                    full_name: user.full_name,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role,
+                    is_active: user.is_active
+                }, token
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
