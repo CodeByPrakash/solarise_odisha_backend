@@ -16,7 +16,7 @@ export const PROJECT_STATUS_TAGS = [
 ];
 
 export const ACTION_STATUS_TAGS = [
-  'open', 'doc_uploaded', 'in_review', 'resolved', 'cancelled'
+  'open', 'doc_uploaded', 'in_review', 'cancelled'
 ];
 
 export const ALL_TAGS = Array.from(new Set([...PROJECT_STATUS_TAGS, ...ACTION_STATUS_TAGS]));
@@ -186,9 +186,8 @@ export const HashtagTagInput = ({
                 key={tag}
                 onClick={() => handleSelectSuggestion(tag)}
                 onMouseEnter={() => setSelectedIndex(idx)}
-                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition text-xs ${
-                  selectedIndex === idx ? 'bg-emerald-50 text-emerald-900 font-semibold' : 'hover:bg-gray-50 text-gray-700'
-                }`}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition text-xs ${selectedIndex === idx ? 'bg-emerald-50 text-emerald-900 font-semibold' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
               >
                 <div className="flex items-center space-x-2">
                   <StatusTag status={tag} showHashtag={true} size="sm" />

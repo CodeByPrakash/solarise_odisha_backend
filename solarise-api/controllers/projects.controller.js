@@ -253,13 +253,10 @@ export const updateProjectStatus = async (req, res) => {
         const { id } = req.params;
         const { status, to_status, current_status, changed_by, remarks } = req.body;
         const newStatus = to_status || status || current_status;
+        const changedBy = changed_by || req.user?.userId || req.user?.id || 1;
 
         if (!newStatus) {
             return res.status(400).json({ error: "New status (to_status) is required" });
-        }
-
-        if (!changed_by) {
-            return res.status(400).json({ error: "changed_by (user ID) is required to record status change history" });
         }
 
         await client.query("BEGIN");
@@ -290,7 +287,7 @@ export const updateProjectStatus = async (req, res) => {
             INSERT INTO status_history (project_id, from_status, to_status, changed_by, remarks)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-        `, [id, fromStatus, newStatus, changed_by, remarks || null]);
+        `, [id, fromStatus, newStatus, changedBy, remarks || null]);
 
         await client.query("COMMIT");
 

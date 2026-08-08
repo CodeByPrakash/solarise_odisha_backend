@@ -40,6 +40,7 @@ export const authService = {
 export const userService = {
   getAll: () => api.get('/users'),
   getById: (id) => api.get(`/users/${id}`),
+  getByRole: (role) => api.get(`/users/role/${role}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
 };
@@ -90,7 +91,8 @@ export const bankLoanService = {
 export const actionService = {
   getAll: () => api.get('/actions'),
   create: (data) => api.post('/actions', data),
-  resolve: (id, data) => api.put(`/actions/${id}/resolve`, data),
+  updateStatus: (id, data) => api.patch(`/actions/${id}/status`, data),
+  resolve: (id, data) => api.patch(`/actions/${id}/status`, { status: 'resolved', ...data }),
 };
 
 // Installation Progress Service

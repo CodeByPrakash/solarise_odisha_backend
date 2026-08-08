@@ -56,47 +56,8 @@ const router = Router();
  *                         format: date-time
  */
 router.get("/", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), getAllUsers);
-
-/**
- * @swagger
- * /api/users/{id}:
- *   get:
- *     summary: Get a user by ID
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: User ID
- *     responses:
- *       200:
- *         description: User data
- *       404:
- *         description: User not found
- */
-router.get("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), getUserById);
-
-/**
- * @swagger
- * /api/users/role/{role}:
- *   get:
- *     summary: Get users by role
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: role
- *         required: true
- *         schema:
- *           type: string
- *           enum: [admin, agent, site_manager, doc_team, accounts]
- *         description: User role to filter by
- *     responses:
- *       200:
- *         description: List of users with the specified role
- */
 router.get("/role/:role", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), getUsersByRole);
+router.get("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), getUserById);
 
 /**
  * @swagger

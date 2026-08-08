@@ -32,17 +32,17 @@ const Sidebar = () => {
   const menuItems = getMenuItems();
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between min-h-screen">
-      <div className="p-6">
+    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between h-screen sticky top-0 shrink-0 z-30">
+      <div className="p-6 overflow-y-auto flex-1">
         {/* Brand Header */}
         <div className="flex items-center space-x-3 mb-8">
-          <div className="flex h-10 w-10 items-center justify-center bg-emerald-50 text-emerald-600 rounded-xl shadow-sm border border-emerald-200">
+          <div className="flex h-10 w-10 items-center justify-center bg-emerald-50 text-emerald-600 rounded-xl shadow-sm border border-emerald-200 shrink-0">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">Solarise Odisha</h1>
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">ADP Solar</h1>
             <p className="text-[11px] text-gray-500 font-medium">PM Surya Ghar Portal</p>
           </div>
         </div>
@@ -59,10 +59,9 @@ const Sidebar = () => {
               end
               className={({ isActive }) => `
                 flex items-center px-3.5 py-2.5 rounded-xl text-xs font-semibold transition
-                ${
-                  isActive
-                    ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ${isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }
               `}
             >
@@ -72,17 +71,19 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      {/* User Role Card Footer */}
-      <div className="p-4 m-4 bg-gray-50 rounded-2xl border border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="h-9 w-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-sm">
-            {(user?.full_name || 'User').charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-gray-900 truncate">{user?.full_name || 'Authorized User'}</p>
-            <span className={`inline-block px-2 py-0.5 mt-0.5 text-[10px] font-bold rounded-full border capitalize uppercase ${roleColorMap[role] || 'bg-gray-100 text-gray-700'}`}>
-              {role.replace(/_/g, ' ')}
-            </span>
+      {/* User Account / Role Card - Pinned visible at bottom of screen */}
+      <div className="p-4 border-t border-gray-100 bg-white">
+        <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <div className="h-9 w-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+              {(user?.full_name || user?.firstName || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-gray-900 truncate">{user?.full_name || user?.firstName || 'Authorized User'}</p>
+              <span className={`inline-block px-2 py-0.5 mt-0.5 text-[10px] font-bold rounded-full border capitalize uppercase ${roleColorMap[role] || 'bg-gray-100 text-gray-700'}`}>
+                {role.replace(/_/g, ' ')}
+              </span>
+            </div>
           </div>
         </div>
       </div>
