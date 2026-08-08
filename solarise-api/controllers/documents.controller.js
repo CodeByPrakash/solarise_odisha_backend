@@ -95,7 +95,7 @@ export const rejectDocument = async (req, res) => {
             UPDATE documents
             SET status = 'rejected', verified_by = $1, verified_at = now(), reject_reason = $2
             WHERE id = $3 AND status = 'uploaded'
-            RETURNING *
+            RETURNING * 
         `, [verified_by, reject_reason, id]);
         if (result.rowCount === 0) {
             const check = await pool.query("SELECT id, status FROM documents WHERE id = $1", [id]);

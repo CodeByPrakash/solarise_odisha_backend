@@ -41,14 +41,15 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     try {
-        const { email, phone, password } = req.body;
-        if ((!email && !phone) || !password) {
-            return res.status(400).json({ error: "Email or phone and password are required" });
+        const { identifier, email, phone, password } = req.body;
+        const loginId = identifier || email || phone;
+        if (!loginId || !password) {
+            return res.status(400).json({ error: "Email or phone number and password are required" });
         }
 
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role, password_hash, is_active FROM users WHERE email = $1 OR phone = $2",
-            [email || null, phone || null]
+            "SELECT id, full_name, email, phone, role, password_hash, is_active FROM users WHERE email = $1 OR phone = $1",
+            [loginId]
         );
         if (result.rowCount === 0) {
             return res.status(401).json({ error: "Invalid credentials" });
@@ -59,7 +60,17 @@ export const login = async (req, res) => {
             return res.status(403).json({ error: "User account is inactive" });
         }
 
-        const passwordMatches = await (password, user.password_hash); //bcrypt.compare
+        let passwordMatches = false;
+        if (user.password_hash === password) {
+            passwordMatches = true;
+        } else {
+            try {
+                passwordMatches = await bcrypt.compare(password, user.password_hash);
+            } catch (e) {
+                passwordMatches = false;
+            }
+        }
+
         if (!passwordMatches) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
@@ -74,7 +85,8 @@ export const login = async (req, res) => {
                     phone: user.phone,
                     role: user.role,
                     is_active: user.is_active
-                }, token
+                },
+                token
             }
         });
     } catch (err) {

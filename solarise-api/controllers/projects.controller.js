@@ -1,14 +1,19 @@
 import pool from "../config/db.js";
 
-// GET /api/projects - List all projects with consumer name and status
+// GET /api/projects - List all projects with consumer name and status (filtered by assigned role/user)
 export const getAllProjects = async (req, res) => {
     try {
-        const result = await pool.query(`
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        const { assigned_site_manager, created_by } = req.query;
+
+        let query = `
             SELECT 
                 p.id,
                 p.consumer_id,
                 c.full_name AS consumer_name,
                 c.electric_consumer_no,
+                c.created_by AS consumer_created_by,
                 p.current_status,
                 p.registration_no,
                 p.capacity_kw,
@@ -19,27 +24,90 @@ export const getAllProjects = async (req, res) => {
             FROM projects p
             JOIN consumers c ON p.consumer_id = c.id
             LEFT JOIN users u ON p.assigned_site_manager = u.id
-            ORDER BY p.created_at DESC
-        `);
+        `;
+
+        const conditions = [];
+        const params = [];
+
+        if (role === 'agent') {
+            params.push(userId);
+            conditions.push(`c.created_by = $${params.length}`);
+        } else if (role === 'site_manager') {
+            params.push(userId);
+            conditions.push(`(p.assigned_site_manager = $${params.length} OR c.created_by = $${params.length})`);
+        } else {
+            if (assigned_site_manager) {
+                params.push(assigned_site_manager);
+                conditions.push(`p.assigned_site_manager = $${params.length}`);
+            }
+            if (created_by) {
+                params.push(created_by);
+                conditions.push(`c.created_by = $${params.length}`);
+            }
+        }
+
+        if (conditions.length > 0) {
+            query += ` WHERE ` + conditions.join(' AND ');
+        }
+
+        query += ` ORDER BY p.created_at DESC`;
+
+        const result = await pool.query(query, params);
         res.status(200).json({ count: result.rowCount, data: result.rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
-// GET /api/projects/dashboard - Aggregate counts by status
+// GET /api/projects/dashboard - Aggregate counts by status (filtered by assigned role/user)
 export const getProjectsDashboard = async (req, res) => {
     try {
-        const result = await pool.query(`
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        const { assigned_site_manager, created_by } = req.query;
+
+        const conditions = [];
+        const params = [];
+
+        if (role === 'agent') {
+            params.push(userId);
+            conditions.push(`c.created_by = $${params.length}`);
+        } else if (role === 'site_manager') {
+            params.push(userId);
+            conditions.push(`(p.assigned_site_manager = $${params.length} OR c.created_by = $${params.length})`);
+        } else {
+            if (assigned_site_manager) {
+                params.push(assigned_site_manager);
+                conditions.push(`p.assigned_site_manager = $${params.length}`);
+            }
+            if (created_by) {
+                params.push(created_by);
+                conditions.push(`c.created_by = $${params.length}`);
+            }
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ` + conditions.join(' AND ') : '';
+
+        const statusQuery = `
             SELECT 
-                current_status, 
+                p.current_status, 
                 COUNT(*)::INTEGER AS count
-            FROM projects
-            GROUP BY current_status
+            FROM projects p
+            JOIN consumers c ON p.consumer_id = c.id
+            ${whereClause}
+            GROUP BY p.current_status
             ORDER BY count DESC
-        `);
+        `;
         
-        const totalResult = await pool.query("SELECT COUNT(*)::INTEGER AS total FROM projects");
+        const totalQuery = `
+            SELECT COUNT(*)::INTEGER AS total 
+            FROM projects p
+            JOIN consumers c ON p.consumer_id = c.id
+            ${whereClause}
+        `;
+
+        const result = await pool.query(statusQuery, params);
+        const totalResult = await pool.query(totalQuery, params);
         const total = totalResult.rows[0]?.total || 0;
 
         res.status(200).json({

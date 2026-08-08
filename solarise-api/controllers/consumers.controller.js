@@ -1,14 +1,27 @@
 import pool from "../config/db.js";
 export const getAllConsumers = async (req, res) => {
     try {
-        const result = await pool.query(
-            "SELECT id, full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, created_at FROM consumers ORDER BY created_at DESC"
-        );
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        let query = "SELECT id, full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, created_at FROM consumers";
+        const params = [];
+
+        if (role === 'agent') {
+            query += " WHERE created_by = $1";
+            params.push(userId);
+        } else if (role === 'site_manager') {
+            query += " WHERE created_by = $1 OR id IN (SELECT consumer_id FROM projects WHERE assigned_site_manager = $1)";
+            params.push(userId);
+        }
+
+        query += " ORDER BY created_at DESC";
+
+        const result = await pool.query(query, params);
         res.status(200).json({ count: result.rowCount, data: result.rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-}
+};
 
 // export const getConsumerById = async (req, res) => {
 //     try {

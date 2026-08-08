@@ -15,17 +15,41 @@ import ownershipTransfersRoutes from "./routes/ownershipTransfers.routes.js";
 import materialDeliveriesRoutes from "./routes/materialDeliveries.routes.js";
 import installationProgressRoutes from "./routes/installationProgress.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
+import statusHistoryRoutes from "./routes/statusHistory.routes.js";
+import notificationsRoutes from "./routes/notifications.routes.js";
 import { authenticateToken } from "./middleware/auth.middleware.js";
+
+// import bcrypt from "bcryptjs";
 import errorHandler from "./middleware/errorHandler.js";
+
+// ─── SWAGGER (START) ── Remove this block after testing is complete ─────────
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./swagger.js";
+// ─── SWAGGER (END) ─────────────────────────────────────────────────────────
+
+
 const app = express();
 const PORT = process.env.PORT || 'your_port';
 
 app.use(cors());
 app.use(express.json());
 
+
+
 app.get("/", (req, res) => {
-    res.send("Hello World!");
+    res.send("Api Working Fine.");
 });
+// ─── SWAGGER UI (START) ── Remove this block after testing is complete ──────
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Solarise Odisha API Docs',
+}));
+app.get("/api-docs.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(swaggerSpec);
+});
+// ─── SWAGGER UI (END) ──────────────────────────────────────────────────────
+
 app.use("/api/auth", authRoutes);
 app.use(authenticateToken);
 app.use("/api/users", usersRoutes);
@@ -39,6 +63,11 @@ app.use("/api/ownership-transfers", ownershipTransfersRoutes);
 app.use("/api/material-deliveries", materialDeliveriesRoutes);
 app.use("/api/installation", installationProgressRoutes);
 app.use("/api/payments", paymentsRoutes);
+app.use("/api/status-history", statusHistoryRoutes);
+app.use("/api/notifications", notificationsRoutes);
+
+// bcrypt.hash('chinu123', 10).then(hash => console.log(hash));
+
 
 // Global error handler — must be LAST middleware
 app.use(errorHandler);

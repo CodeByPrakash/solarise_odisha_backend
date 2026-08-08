@@ -101,35 +101,36 @@ export const initChecklist = async (req, res) => {
     }
 };
 
-// 3. PATCH /api/installation/:id/complete - Mark one item as done
+// 3. PATCH /api/installation/:id/complete - Mark one item as done / toggle status
 export const completeItem = async (req, res) => {
     try {
         const { id } = req.params;
-        const { done_by } = req.body;
+        const targetState = req.body?.is_done !== undefined ? Boolean(req.body.is_done) : true;
+        let userId = req.body?.done_by || req.user?.userId || req.user?.id;
 
-        if (!done_by) {
-            return res.status(400).json({ error: "done_by (user ID) is required" });
+        if (userId) {
+            const userCheck = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+            if (userCheck.rowCount === 0) {
+                userId = null;
+            }
+        } else {
+            userId = null;
         }
 
         const result = await pool.query(`
             UPDATE installation_progress
-            SET is_done = TRUE, done_by = $1, done_at = now()
-            WHERE id = $2 AND is_done = FALSE
+            SET is_done = $1, 
+                done_by = CASE WHEN $1 = TRUE THEN $2::INTEGER ELSE NULL END, 
+                done_at = CASE WHEN $1 = TRUE THEN now() ELSE NULL END
+            WHERE id = $3
             RETURNING *
-        `, [done_by, id]);
+        `, [targetState, userId, id]);
 
         if (result.rowCount === 0) {
-            const check = await pool.query(
-                "SELECT id, is_done FROM installation_progress WHERE id = $1",
-                [id]
-            );
-            if (check.rowCount === 0) {
-                return res.status(404).json({ error: "Installation item not found" });
-            }
-            return res.status(400).json({ error: "Item is already marked as done" });
+            return res.status(404).json({ error: "Installation item not found" });
         }
 
-        res.status(200).json({ message: "Item marked as complete", data: result.rows[0] });
+        res.status(200).json({ message: `Item marked as ${targetState ? 'complete' : 'pending'}`, data: result.rows[0] });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -155,5 +156,99 @@ export const getProgress = async (req, res) => {
         res.status(200).json({ data: result.rows[0] });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+// 5. POST /api/installation/project/:projectId/batch - Save all items in a single batch
+export const saveChecklistBatch = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { projectId } = req.params;
+        const { items, done_by } = req.body;
+
+        let userId = done_by || req.user?.userId || req.user?.id;
+        if (userId) {
+            const userCheck = await client.query("SELECT id FROM users WHERE id = $1", [userId]);
+            if (userCheck.rowCount === 0) {
+                userId = null;
+            }
+        } else {
+            userId = null;
+        }
+
+        if (!Array.isArray(items)) {
+            return res.status(400).json({ error: "items array is required" });
+        }
+
+        await client.query("BEGIN");
+
+        // Ensure project exists
+        const projectCheck = await client.query("SELECT id FROM projects WHERE id = $1", [projectId]);
+        if (projectCheck.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Project not found" });
+        }
+
+        // Ensure initialization if empty
+        const countCheck = await client.query(
+            "SELECT COUNT(*)::INTEGER AS count FROM installation_progress WHERE project_id = $1",
+            [projectId]
+        );
+
+        if (countCheck.rows[0].count === 0) {
+            const values = INSTALLATION_ITEMS.map((item, i) => {
+                const offset = i * 3;
+                return `($${offset + 1}, $${offset + 2}::installation_item, $${offset + 3})`;
+            }).join(", ");
+            const params = INSTALLATION_ITEMS.flatMap(item => [
+                projectId, item.item, item.weight_pct
+            ]);
+            await client.query(`
+                INSERT INTO installation_progress (project_id, item, weight_pct)
+                VALUES ${values}
+            `, params);
+        }
+
+        // Update each item state
+        for (const it of items) {
+            if (!it.item) continue;
+            const isDone = Boolean(it.is_done);
+            await client.query(`
+                UPDATE installation_progress
+                SET is_done = $1,
+                    done_by = CASE WHEN $1 = TRUE THEN $2::INTEGER ELSE NULL END,
+                    done_at = CASE WHEN $1 = TRUE THEN now() ELSE NULL END
+                WHERE project_id = $3 AND item = $4::installation_item
+            `, [isDone, userId, projectId, it.item]);
+        }
+
+        await client.query("COMMIT");
+
+        const updatedResult = await pool.query(`
+            SELECT 
+                ip.id,
+                ip.project_id,
+                ip.item,
+                ip.weight_pct,
+                ip.is_done,
+                ip.done_by,
+                u.full_name AS done_by_name,
+                ip.done_at
+            FROM installation_progress ip
+            LEFT JOIN users u ON ip.done_by = u.id
+            WHERE ip.project_id = $1
+            ORDER BY ip.id
+        `, [projectId]);
+
+        res.status(200).json({
+            message: "Installation checklist saved successfully",
+            data: updatedResult.rows
+        });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("saveChecklistBatch Error:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 };
