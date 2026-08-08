@@ -138,7 +138,7 @@ const DocumentDetailsPage = () => {
         </div>
         <div className="mt-4 md:mt-0 flex items-center space-x-3">
           {document.status === 'uploaded' && (
-            <RoleGuard allowedRoles={['doc_team']}>
+            <RoleGuard allowedRoles={['doc_team', 'admin']}>
               <button
                 onClick={handleVerify}
                 disabled={verifying}

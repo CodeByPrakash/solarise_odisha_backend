@@ -6,10 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 const PAYMENT_TYPES = [
   { value: 'processing_fee', label: 'DISCOM Processing Fee' },
   { value: 'security_deposit', label: 'DISCOM Security Deposit' },
-  { value: 'loan_disbursement', label: 'Bank Loan Disbursal' },
-  { value: 'cfa_subsidy', label: 'Central Financial Assistance (CFA Subsidy)' },
-  { value: 'sfa_subsidy', label: 'State Financial Assistance (SFA Subsidy)' },
-  { value: 'final_settlement', label: 'Final Settlement Payment' },
+  { value: 'consumer_payment', label: 'Consumer Direct Payment' },
+  { value: 'loan_disbursal', label: 'Bank Loan Disbursal' },
+  { value: 'subsidy_cfa', label: 'Central Financial Assistance (CFA Subsidy)' },
+  { value: 'subsidy_sfa', label: 'State Financial Assistance (SFA Subsidy)' },
 ];
 
 const NewPaymentPage = () => {

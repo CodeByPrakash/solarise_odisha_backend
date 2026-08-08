@@ -156,7 +156,7 @@ const PaymentDetailsPage = () => {
       </div>
 
       {/* Payment Clearance / Status Update Form */}
-      <RoleGuard allowedRoles={['accounts']}>
+      <RoleGuard allowedRoles={['accounts', 'admin']}>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
             <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,4 +1,5 @@
 import React from 'react';
+import NotificationPopup from './NotificationPopup';
 
 const TopBar = ({ onLogout, user }) => {
   return (
@@ -34,19 +35,8 @@ const TopBar = ({ onLogout, user }) => {
           </div>
         </div>
 
-        {/* Notifications */}
-        <div className="relative">
-          <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0018 0z"/>
-            </svg>
-            {/* Badge for unread notifications */}
-            <div className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center bg-solarise-green text-white rounded-full text-xs">
-              3
-            </div>
-          </button>
-        </div>
+        {/* Real-Time Interactive Notification Popup */}
+        <NotificationPopup user={user} />
 
         {/* User profile */}
         <div className="flex items-center space-x-3">

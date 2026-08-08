@@ -10,6 +10,8 @@ import {
   userService,
 } from '../../services/api';
 import api from '../../services/api';
+import StatusTag from '../../components/tags/StatusTag';
+import HashtagTagInput from '../../components/tags/HashtagTagInput';
 
 // Helper status color badge mapping for all 44+ project status tags
 export const getStatusTagBadge = (status) => {
@@ -320,12 +322,10 @@ const ProjectDetailsPage = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
         <div>
           <div className="flex items-center space-x-3">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
               PROJ-{project.id}
             </span>
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${getStatusTagBadge(project.current_status)} uppercase tracking-wider`}>
-              {(project.current_status || 'new_registration').replace(/_/g, ' ')}
-            </span>
+            <StatusTag status={project.current_status || 'new_registration'} size="lg" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">
             {project.registration_no || `Solar Installation #${project.id}`}
@@ -361,38 +361,42 @@ const ProjectDetailsPage = () => {
             <span>Project Status Transition Desk</span>
           </h2>
           <form onSubmit={handleUpdateStatus} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-600 mb-1">
-                Select Next Project Status Tag (40+ Enum States)
-              </label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase text-gray-600">
+                  Target Project Status Tag (40+ States)
+                </label>
+                <StatusTag status={selectedStatus} showHashtag={true} size="md" />
+              </div>
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 bg-white"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 bg-white"
               >
                 {ALL_PROJECT_STATUSES.map((st) => (
                   <option key={st} value={st}>
-                    {st.replace(/_/g, ' ').toUpperCase()}
+                    #{st} — ({st.replace(/_/g, ' ').toUpperCase()})
                   </option>
                 ))}
               </select>
             </div>
+
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-600 mb-1">
-                Status Change Remarks
+                Status Change Remarks & Hashtags (#)
               </label>
-              <textarea
+              <HashtagTagInput
                 value={statusRemarks}
-                onChange={(e) => setStatusRemarks(e.target.value)}
-                rows={2}
-                placeholder="Enter validation remarks or approval details..."
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500"
+                onChange={setStatusRemarks}
+                onSelectTag={(t) => setSelectedStatus(t)}
+                placeholder="Type validation remarks or # to insert tag..."
               />
             </div>
+
             <button
               type="submit"
               disabled={updatingStatus}
-              className="px-5 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="px-5 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
             >
               {updatingStatus ? 'Updating Tag...' : 'Update Status Tag'}
             </button>
@@ -541,10 +545,10 @@ const ProjectDetailsPage = () => {
         ) : (
           <div className="space-y-3">
             {actions.map((act) => (
-              <div key={act.id} className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs space-y-1">
-                <div className="flex justify-between font-semibold text-amber-900">
+              <div key={act.id} className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-xs space-y-1.5">
+                <div className="flex justify-between items-center font-semibold text-amber-900">
                   <span className="capitalize">{(act.action_type || '').replace(/_/g, ' ')}</span>
-                  <span className="uppercase px-2 py-0.5 bg-amber-200 rounded-full text-[10px]">{act.status}</span>
+                  <StatusTag status={act.status || 'open'} size="sm" />
                 </div>
                 <p className="text-amber-800">{act.detail || 'No details specified'}</p>
               </div>
@@ -568,12 +572,17 @@ const ProjectDetailsPage = () => {
           <div className="relative pl-6 border-l-2 border-emerald-200 space-y-6">
             {statusHistory.map((hist) => (
               <div key={hist.id} className="relative">
-                <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"></div>
+                <div className="absolute -left-[31px] top-0.5 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"></div>
                 <div className="text-xs space-y-1">
-                  <span className="font-semibold text-gray-900 uppercase">
-                    {(hist.to_status || '').replace(/_/g, ' ')}
-                  </span>
-                  <p className="text-gray-500">{hist.remarks || 'Status transition logged'}</p>
+                  <div className="flex items-center space-x-2">
+                    <StatusTag status={hist.to_status} size="sm" />
+                    {hist.from_status && (
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        (from <span className="underline">#{hist.from_status}</span>)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-600 pt-0.5">{hist.remarks || 'Status transition logged'}</p>
                   <p className="text-[10px] text-gray-400 font-mono">
                     {new Date(hist.changed_at).toLocaleString()}
                   </p>

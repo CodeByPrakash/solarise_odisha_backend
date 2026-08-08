@@ -70,9 +70,14 @@ export const projectService = {
 // Documents Service
 export const documentService = {
   getAll: () => api.get('/documents'),
+  getById: (id) => api.get(`/documents/${id}`),
   getByConsumer: (consumerId) => api.get(`/documents/consumer/${consumerId}`),
+  getStatusSummary: () => api.get('/documents/status-summary'),
+  create: (data) => api.post('/documents', data),
   upload: (data) => api.post('/documents', data),
-  verify: (id, data) => api.put(`/documents/${id}/verify`, data),
+  verify: (id, data) => api.patch(`/documents/${id}/verify`, data),
+  reject: (id, data) => api.patch(`/documents/${id}/reject`, data),
+  reupload: (id, data) => api.post(`/documents/${id}/reupload`, data),
 };
 
 // Bank Loans Service
@@ -100,14 +105,21 @@ export const installationService = {
 // Payments Service
 export const paymentService = {
   getAll: () => api.get('/payments'),
+  getById: (id) => api.get(`/payments/${id}`),
   getByProject: (projectId) => api.get(`/payments/project/${projectId}`),
+  getPending: () => api.get('/payments/pending'),
+  getSummary: () => api.get('/payments/summary'),
   create: (data) => api.post('/payments', data),
+  updateStatus: (id, data) => api.patch(`/payments/${id}/status`, data),
 };
 
 // Notifications Service
 export const notificationService = {
   getAll: () => api.get('/notifications'),
-  markRead: (id) => api.put(`/notifications/${id}/read`),
+  getUserNotifications: (userId) => api.get(`/notifications/user/${userId}`),
+  create: (data) => api.post('/notifications', data),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  delete: (id) => api.delete(`/notifications/${id}`),
 };
 
 export default api;
