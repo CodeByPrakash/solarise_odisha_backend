@@ -1,5 +1,93 @@
 import pool from "../config/db.js";
 
+// GET /api/documents - List all documents (filtered by role)
+export const getAllDocuments = async (req, res) => {
+    try {
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        let query = `
+            SELECT 
+                d.id,
+                d.consumer_id,
+                c.full_name AS consumer_name,
+                d.doc_type,
+                d.file_url,
+                d.file_name,
+                d.mime_type,
+                d.geo_lat,
+                d.geo_lng,
+                d.status,
+                d.uploaded_by,
+                u1.full_name AS uploaded_by_name,
+                d.uploaded_at,
+                d.verified_by,
+                u2.full_name AS verified_by_name,
+                d.verified_at,
+                d.reject_reason,
+                d.version
+            FROM documents d
+            JOIN consumers c ON d.consumer_id = c.id
+            LEFT JOIN users u1 ON d.uploaded_by = u1.id
+            LEFT JOIN users u2 ON d.verified_by = u2.id
+        `;
+        const params = [];
+        if (role === 'agent') {
+            query += ` WHERE c.created_by = $1`;
+            params.push(userId);
+        } else if (role === 'site_manager') {
+            query += ` WHERE (c.created_by = $1 OR EXISTS (SELECT 1 FROM projects p WHERE p.consumer_id = c.id AND p.assigned_site_manager = $1))`;
+            params.push(userId);
+        }
+        query += ` ORDER BY d.uploaded_at DESC`;
+
+        const result = await pool.query(query, params);
+        res.status(200).json({ count: result.rowCount, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// GET /api/documents/:id - Get document details by ID
+export const getDocumentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT 
+                d.id,
+                d.consumer_id,
+                c.full_name AS consumer_name,
+                d.doc_type,
+                d.file_url,
+                d.file_name,
+                d.mime_type,
+                d.geo_lat,
+                d.geo_lng,
+                d.status,
+                d.uploaded_by,
+                u1.full_name AS uploaded_by_name,
+                d.uploaded_at,
+                d.verified_by,
+                u2.full_name AS verified_by_name,
+                d.verified_at,
+                d.reject_reason,
+                d.version
+            FROM documents d
+            JOIN consumers c ON d.consumer_id = c.id
+            LEFT JOIN users u1 ON d.uploaded_by = u1.id
+            LEFT JOIN users u2 ON d.verified_by = u2.id
+            WHERE d.id = $1
+        `, [id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Document not found" });
+        }
+
+        res.status(200).json({ data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const getDocumentsByConsumer = async (req, res) => {
     try {
         const { consumerId } = req.params;

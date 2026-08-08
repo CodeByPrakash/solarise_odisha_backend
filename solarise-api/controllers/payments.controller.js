@@ -1,5 +1,83 @@
 import pool from "../config/db.js";
 
+// GET /api/payments - List all payments (filtered by user role)
+export const getAllPayments = async (req, res) => {
+    try {
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        let query = `
+            SELECT 
+                pay.id,
+                pay.project_id,
+                p.registration_no,
+                c.full_name AS consumer_name,
+                pay.payment_type,
+                pay.amount,
+                pay.status,
+                pay.reference_no,
+                pay.paid_at,
+                pay.recorded_by,
+                u.full_name AS recorded_by_name,
+                pay.remarks,
+                pay.created_at
+            FROM payments pay
+            JOIN projects p ON pay.project_id = p.id
+            JOIN consumers c ON p.consumer_id = c.id
+            LEFT JOIN users u ON pay.recorded_by = u.id
+        `;
+        const params = [];
+        if (role === 'agent') {
+            query += ` WHERE c.created_by = $1`;
+            params.push(userId);
+        } else if (role === 'site_manager') {
+            query += ` WHERE (p.assigned_site_manager = $1 OR c.created_by = $1)`;
+            params.push(userId);
+        }
+        query += ` ORDER BY pay.created_at DESC`;
+
+        const result = await pool.query(query, params);
+        res.status(200).json({ count: result.rowCount, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// GET /api/payments/:id - Get payment record by ID
+export const getPaymentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(`
+            SELECT 
+                pay.id,
+                pay.project_id,
+                p.registration_no,
+                c.full_name AS consumer_name,
+                pay.payment_type,
+                pay.amount,
+                pay.status,
+                pay.reference_no,
+                pay.paid_at,
+                pay.recorded_by,
+                u.full_name AS recorded_by_name,
+                pay.remarks,
+                pay.created_at
+            FROM payments pay
+            JOIN projects p ON pay.project_id = p.id
+            JOIN consumers c ON p.consumer_id = c.id
+            LEFT JOIN users u ON pay.recorded_by = u.id
+            WHERE pay.id = $1
+        `, [id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Payment record not found" });
+        }
+
+        res.status(200).json({ data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // 1. GET /api/payments/project/:projectId - All payments for a project
 export const getPaymentsByProject = async (req, res) => {
     try {

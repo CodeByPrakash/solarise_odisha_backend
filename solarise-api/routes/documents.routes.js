@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+    getAllDocuments,
+    getDocumentById,
     getDocumentsByConsumer,
     createDocument,
     verifyDocument,
@@ -28,7 +30,19 @@ const router = Router();
  *       200:
  *         description: Summary of document statuses
  */
-router.get("/status-summary", authenticateToken, authorizeRoles('doc_team', 'admin'), getDocumentStatusSummary);
+router.get("/status-summary", authenticateToken, authorizeRoles('doc_team', 'admin', 'agent', 'site_manager', 'accounts'), getDocumentStatusSummary);
+
+/**
+ * @swagger
+ * /api/documents:
+ *   get:
+ *     summary: Get all documents
+ *     tags: [Documents]
+ *     responses:
+ *       200:
+ *         description: List of documents
+ */
+router.get("/", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getAllDocuments);
 
 /**
  * @swagger
@@ -46,7 +60,27 @@ router.get("/status-summary", authenticateToken, authorizeRoles('doc_team', 'adm
  *       200:
  *         description: List of documents for the consumer
  */
-router.get("/consumer/:consumerId", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), getDocumentsByConsumer);
+router.get("/consumer/:consumerId", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getDocumentsByConsumer);
+
+/**
+ * @swagger
+ * /api/documents/{id}:
+ *   get:
+ *     summary: Get document by ID
+ *     tags: [Documents]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Document details
+ *       404:
+ *         description: Document not found
+ */
+router.get("/:id", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getDocumentById);
 
 /**
  * @swagger
@@ -72,7 +106,7 @@ router.get("/consumer/:consumerId", authenticateToken, authorizeRoles('agent', '
  *       201:
  *         description: Document created
  */
-router.post("/", authenticateToken, authorizeRoles('agent', 'doc_team', 'admin'), createDocument);
+router.post("/", authenticateToken, authorizeRoles('agent', 'doc_team', 'admin', 'site_manager'), createDocument);
 
 /**
  * @swagger
@@ -143,6 +177,6 @@ router.patch("/:id/reject", authenticateToken, authorizeRoles('admin', 'doc_team
  *       200:
  *         description: Document re-uploaded
  */
-router.post("/:id/reupload", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team'), reuploadDocument);
+router.post("/:id/reupload", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), reuploadDocument);
 
 export default router;

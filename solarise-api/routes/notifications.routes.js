@@ -108,7 +108,7 @@ router.post("/", authenticateToken, authorizeRoles('admin', 'agent', 'site_manag
  *       200:
  *         description: Marked as read
  */
-router.patch("/:id/read", authenticateToken, authorizeRoles('admin', 'site_manager', 'doc_team', 'accounts'), markNotificationAsRead);
+router.patch("/:id/read", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), markNotificationAsRead);
 
 /**
  * @swagger

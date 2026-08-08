@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+    getAllPayments,
+    getPaymentById,
     getPaymentsByProject,
     createPayment,
     updatePaymentStatus,
@@ -26,7 +28,7 @@ const router = Router();
  *       200:
  *         description: List of pending payments
  */
-router.get("/pending", authenticateToken, authorizeRoles('accounts', 'admin'), getPendingPayments);
+router.get("/pending", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent'), getPendingPayments);
 
 /**
  * @swagger
@@ -38,7 +40,19 @@ router.get("/pending", authenticateToken, authorizeRoles('accounts', 'admin'), g
  *       200:
  *         description: Payments summary data
  */
-router.get("/summary", authenticateToken, authorizeRoles('accounts', 'admin'), getPaymentsSummary);
+router.get("/summary", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent', 'doc_team'), getPaymentsSummary);
+
+/**
+ * @swagger
+ * /api/payments:
+ *   get:
+ *     summary: Get all payment records
+ *     tags: [Payments]
+ *     responses:
+ *       200:
+ *         description: List of payment records
+ */
+router.get("/", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent', 'doc_team'), getAllPayments);
 
 /**
  * @swagger
@@ -56,7 +70,27 @@ router.get("/summary", authenticateToken, authorizeRoles('accounts', 'admin'), g
  *       200:
  *         description: Payment records for project
  */
-router.get("/project/:projectId", authenticateToken, authorizeRoles('accounts', 'admin'), getPaymentsByProject);
+router.get("/project/:projectId", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent', 'doc_team'), getPaymentsByProject);
+
+/**
+ * @swagger
+ * /api/payments/{id}:
+ *   get:
+ *     summary: Get payment record by ID
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment record details
+ *       404:
+ *         description: Payment record not found
+ */
+router.get("/:id", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent', 'doc_team'), getPaymentById);
 
 /**
  * @swagger
@@ -78,16 +112,16 @@ router.get("/project/:projectId", authenticateToken, authorizeRoles('accounts', 
  *                 type: number
  *               payment_type:
  *                 type: string
- *               payment_date:
+ *                 enum: [processing_fee, security_deposit, consumer_payment, loan_disbursal, subsidy_cfa, subsidy_sfa]
+ *               reference_no:
  *                 type: string
- *                 format: date
- *               notes:
+ *               remarks:
  *                 type: string
  *     responses:
  *       201:
  *         description: Payment created
  */
-router.post("/", authenticateToken, authorizeRoles('accounts', 'admin'), createPayment);
+router.post("/", authenticateToken, authorizeRoles('accounts', 'admin', 'site_manager', 'agent', 'doc_team'), createPayment);
 
 /**
  * @swagger
