@@ -97,7 +97,7 @@ router.get("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'site_man
  *       409:
  *         description: Email or phone already exists
  */
-router.post("/", authenticateToken, authorizeRoles('admin', 'doc_team'), createUser);
+router.post("/", authenticateToken, authorizeRoles('admin', 'doc_team', 'site_manager', 'accounts', 'agent'), createUser);
 
 /**
  * @swagger
