@@ -216,8 +216,8 @@ const ProjectDetailsPage = () => {
 
       // Fetch actions required
       try {
-        const actRes = await actionService.getAll();
-        const projActions = (actRes.data?.data || actRes.data || []).filter(a => String(a.project_id) === String(id));
+        const actRes = await actionService.getByProject(id);
+        const projActions = actRes.data?.data || actRes.data || [];
         setActions(projActions);
       } catch (e) {
         setActions([]);
@@ -501,7 +501,7 @@ const ProjectDetailsPage = () => {
               onClick={handleStartNewDeliveryBatch}
               className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-300 transition flex items-center space-x-1"
             >
-              <span>{showDeliveryForm && !editingDeliveryId ? '✕ Close Form' : '+ Record New Delivery Batch'}</span>
+              <span>{showDeliveryForm && !editingDeliveryId ? 'Close Form' : '+ Record New Delivery Batch'}</span>
             </button>
           </div>
 
@@ -512,7 +512,7 @@ const ProjectDetailsPage = () => {
                 <div className="flex justify-between items-center">
                   <label className="block text-xs font-bold text-blue-900">
                     {editingDeliveryId
-                      ? '✏️ Edit Delivery Record (Add/Update DCR Serial Numbers)'
+                      ? 'Edit Delivery Record (Add/Update DCR Serial Numbers)'
                       : 'Record Delivered Material DCR Numbers'}
                   </label>
                   <button
@@ -593,14 +593,14 @@ const ProjectDetailsPage = () => {
                     </span>
                     <div className="flex items-center space-x-3">
                       <span className="text-[11px] text-emerald-800 font-semibold">
-                        📅 {new Date(delivery.delivered_at).toLocaleDateString()} {new Date(delivery.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(delivery.delivered_at).toLocaleDateString()} {new Date(delivery.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleStartEditDelivery(delivery)}
                         className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-300 transition flex items-center space-x-1 shadow-2xs"
                       >
-                        <span>✏️ Edit</span>
+                        <span>Edit</span>
                       </button>
                     </div>
                   </div>
@@ -616,7 +616,7 @@ const ProjectDetailsPage = () => {
                             key={idx}
                             className="inline-flex items-center px-2.5 py-1 bg-white text-emerald-950 font-mono font-bold text-[11px] rounded-lg border border-emerald-300 shadow-2xs"
                           >
-                            📄 {dcr.trim()}
+                            {dcr.trim()}
                           </span>
                         ))
                       ) : (
@@ -661,7 +661,7 @@ const ProjectDetailsPage = () => {
               disabled={savingChecklist}
               className="px-5 py-2.5 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm flex items-center space-x-1.5"
             >
-              <span>{savingChecklist ? 'Saving Progress...' : '💾 Save Installation Progress'}</span>
+              <span>{savingChecklist ? 'Saving Progress...' : 'Save Installation Progress'}</span>
             </button>
           </div>
         </div>
@@ -711,7 +711,7 @@ const ProjectDetailsPage = () => {
             disabled={savingChecklist}
             className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
           >
-            {savingChecklist ? 'Saving Progress...' : '💾 Save Installation Progress'}
+            {savingChecklist ? 'Saving Progress...' : 'Save Installation Progress'}
           </button>
         </div>
       </div>
@@ -737,11 +737,10 @@ const ProjectDetailsPage = () => {
                     <StatusTag status={act.status || 'open'} size="sm" />
                     {act.status !== 'resolved' && (
                       <button
-                        onClick={() => handleResolveAction(act.id)}
-                        disabled={resolvingActionId === act.id}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition disabled:opacity-50 shadow-xs"
+                        onClick={() => navigate('/documents')}
+                        className="px-2.5 py-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-[10px] rounded-lg transition shadow-xs flex items-center space-x-1"
                       >
-                        {resolvingActionId === act.id ? 'Resolving...' : '✓ Resolve Action'}
+                        <span>Document Desk →</span>
                       </button>
                     )}
                   </div>
@@ -749,7 +748,7 @@ const ProjectDetailsPage = () => {
                 <p className="text-amber-800">{act.detail || 'No details specified'}</p>
                 {act.status === 'resolved' && (
                   <div className="text-[10px] text-emerald-700 font-semibold flex items-center space-x-1 pt-1.5 border-t border-emerald-200/60">
-                    <span>✓ Resolved by user #{act.resolved_by || '1'}</span>
+                    <span>Resolved by user #{act.resolved_by || '1'}</span>
                   </div>
                 )}
               </div>
@@ -812,6 +811,7 @@ const ProjectDetailsPage = () => {
                   <option value="commercial_to_domestic">Commercial to Domestic Conversion</option>
                   <option value="bank_passbook_name_correction">Bank Passbook Name Correction</option>
                   <option value="bank_passbook_update">Bank Passbook Update</option>
+                  <option value="other">Other Requirement</option>
                 </select>
               </div>
 

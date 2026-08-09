@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS area_blocks (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
+    district TEXT NOT NULL DEFAULT 'Khurda',
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -270,3 +271,7 @@ SELECT setval(
     COALESCE((SELECT MAX(id) FROM material_deliveries), 1),
     true
 );
+
+-- Ensure district column exists on area_blocks with default value
+ALTER TABLE area_blocks ADD COLUMN IF NOT EXISTS district TEXT NOT NULL DEFAULT 'Khurda';
+

@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { notifyUsers } from "../utils/notificationHelper.js";
 
 // 1. GET /api/actions - List all open actions
 export const getAllOpenActions = async (req, res) => {
@@ -11,14 +12,15 @@ export const getAllOpenActions = async (req, res) => {
                 ar.detail,
                 ar.status,
                 ar.raised_by,
-                u1.full_name AS raised_by_name,
+                u1.first_name || ' ' || u1.last_name AS raised_by_name,
                 ar.raised_at,
                 ar.assigned_to,
-                u2.full_name AS assigned_to_name,
+                u2.first_name || ' ' || u2.last_name AS assigned_to_name,
                 ar.resolved_by,
-                u3.full_name AS resolved_by_name,
+                u3.first_name || ' ' || u3.last_name AS resolved_by_name,
                 ar.resolved_at,
                 c.full_name AS consumer_name,
+                p.consumer_id,
                 p.current_status AS project_status
             FROM action_required ar
             JOIN projects p ON ar.project_id = p.id
@@ -47,12 +49,12 @@ export const getActionsByProject = async (req, res) => {
                 ar.detail,
                 ar.status,
                 ar.raised_by,
-                u1.full_name AS raised_by_name,
+                u1.first_name || ' ' || u1.last_name AS raised_by_name,
                 ar.raised_at,
                 ar.assigned_to,
-                u2.full_name AS assigned_to_name,
+                u2.first_name || ' ' || u2.last_name AS assigned_to_name,
                 ar.resolved_by,
-                u3.full_name AS resolved_by_name,
+                u3.first_name || ' ' || u3.last_name AS resolved_by_name,
                 ar.resolved_at
             FROM action_required ar
             LEFT JOIN users u1 ON ar.raised_by = u1.id
@@ -67,7 +69,7 @@ export const getActionsByProject = async (req, res) => {
     }
 };
 
-// 3. POST /api/actions - Raise new action (doc team)
+// 3. POST /api/actions - Raise new action (doc team / admin / site_manager)
 export const createAction = async (req, res) => {
     try {
         const { project_id, action_type, detail, raised_by, assigned_to } = req.body;
@@ -109,20 +111,28 @@ export const createAction = async (req, res) => {
                 SET status = 'action_required'
                 WHERE consumer_id = $1
                   AND (
-                    ($2 = 'electric_bill_name_correction' AND doc_type IN ('electric_bill', 'electricity_bill')) OR
-                    ($2 = 'bank_passbook_name_correction' AND doc_type = 'bank_passbook') OR
-                    ($2 = 'bank_passbook_update' AND doc_type = 'bank_passbook') OR
-                    ($2 = 'ownership_transfer' AND doc_type IN ('land_ror', 'ror', 'aadhaar_card', 'aadhaar')) OR
+                    ($2 = 'electric_bill_name_correction' AND doc_type::text IN ('electric_bill', 'electricity_bill')) OR
+                    ($2 = 'bank_passbook_name_correction' AND doc_type::text = 'bank_passbook') OR
+                    ($2 = 'bank_passbook_update' AND doc_type::text = 'bank_passbook') OR
+                    ($2 = 'ownership_transfer' AND doc_type::text IN ('land_ror', 'ror', 'aadhaar_card', 'aadhaar')) OR
                     ($2 NOT IN ('electric_bill_name_correction', 'bank_passbook_name_correction', 'bank_passbook_update', 'ownership_transfer'))
                   )
             `, [consumerId, action_type]);
         }
 
-        // Record in status_history timeline
+        // Record in status_history timeline (using correct column names: from_status, to_status)
         await pool.query(`
-            INSERT INTO status_history (project_id, previous_status, new_status, changed_by, remarks)
+            INSERT INTO status_history (project_id, from_status, to_status, changed_by, remarks)
             VALUES ($1, $2, 'action_required', $3, $4)
         `, [project_id, prevStatus, raisedBy, `Action Raised: ${action_type.replace(/_/g, ' ')}`]);
+
+        // Notify roles about the new action
+        notifyUsers({
+            targetRoles: ['admin', 'agent', 'doc_team'],
+            projectId: project_id,
+            title: `Action Required Raised: ${action_type.replace(/_/g, ' ')}`,
+            body: `Action item raised for Project #${project_id}: ${detail || 'Details updated'}`
+        });
 
         res.status(201).json({ data: result.rows[0] });
     } catch (err) {
@@ -130,7 +140,7 @@ export const createAction = async (req, res) => {
             return res.status(400).json({ error: "Referenced project or user does not exist" });
         }
         if (err.code === "22P02") {
-            return res.status(400).json({ error: "Invalid action_type value" });
+            return res.status(400).json({ error: `Invalid action_type or ENUM value: ${err.message}` });
         }
         res.status(500).json({ error: err.message });
     }
@@ -180,20 +190,28 @@ export const updateActionStatus = async (req, res) => {
                 WHERE id = $1 AND current_status = 'action_required'
             `, [project_id]);
 
-            // Update matching consumer documents from 'action_required' to 'verified'
+            // Update matching consumer documents from 'action_required', 'uploaded', 'rejected' to 'verified'
             if (consumer_id) {
                 await pool.query(`
                     UPDATE documents
                     SET status = 'verified', verified_by = $1, verified_at = now()
-                    WHERE consumer_id = $2 AND status = 'action_required'
+                    WHERE consumer_id = $2 AND status IN ('action_required', 'uploaded', 'rejected')
                 `, [resolvedBy, consumer_id]);
             }
 
-            // Record resolution in status_history
+            // Record resolution in status_history (using correct column names: from_status, to_status)
             await pool.query(`
-                INSERT INTO status_history (project_id, previous_status, new_status, changed_by, remarks)
+                INSERT INTO status_history (project_id, from_status, to_status, changed_by, remarks)
                 VALUES ($1, $2, 'doc_verified', $3, $4)
             `, [project_id, prevStatus, resolvedBy, `Action Resolved: ${action_type.replace(/_/g, ' ')}`]);
+
+            // Notify roles about resolution
+            notifyUsers({
+                targetRoles: ['admin', 'agent', 'doc_team'],
+                projectId: project_id,
+                title: `Action Resolved: ${action_type.replace(/_/g, ' ')}`,
+                body: `Action item for Project #${project_id} has been resolved.`
+            });
         } else {
             result = await pool.query(`
                 UPDATE action_required
@@ -224,10 +242,10 @@ export const getOverdueActions = async (req, res) => {
                 ar.detail,
                 ar.status,
                 ar.raised_by,
-                u1.full_name AS raised_by_name,
+                u1.first_name || ' ' || u1.last_name AS raised_by_name,
                 ar.raised_at,
                 ar.assigned_to,
-                u2.full_name AS assigned_to_name,
+                u2.first_name || ' ' || u2.last_name AS assigned_to_name,
                 c.full_name AS consumer_name,
                 p.current_status AS project_status,
                 EXTRACT(DAY FROM NOW() - ar.raised_at)::INTEGER AS days_open

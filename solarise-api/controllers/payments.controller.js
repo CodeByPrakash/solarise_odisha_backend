@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { notifyUsers } from "../utils/notificationHelper.js";
 
 // GET /api/payments - List all payments (filtered by user role)
 export const getAllPayments = async (req, res) => {
@@ -17,7 +18,7 @@ export const getAllPayments = async (req, res) => {
                 pay.reference_no,
                 pay.paid_at,
                 pay.recorded_by,
-                u.full_name AS recorded_by_name,
+                u.first_name || ' ' || u.last_name AS recorded_by_name,
                 pay.remarks,
                 pay.created_at
             FROM payments pay
@@ -58,7 +59,7 @@ export const getPaymentById = async (req, res) => {
                 pay.reference_no,
                 pay.paid_at,
                 pay.recorded_by,
-                u.full_name AS recorded_by_name,
+                u.first_name || ' ' || u.last_name AS recorded_by_name,
                 pay.remarks,
                 pay.created_at
             FROM payments pay
@@ -92,7 +93,7 @@ export const getPaymentsByProject = async (req, res) => {
                 pay.reference_no,
                 pay.paid_at,
                 pay.recorded_by,
-                u.full_name AS recorded_by_name,
+                u.first_name || ' ' || u.last_name AS recorded_by_name,
                 pay.remarks,
                 pay.created_at
             FROM payments pay
@@ -126,7 +127,15 @@ export const createPayment = async (req, res) => {
             RETURNING *
         `, [project_id, payment_type, amount, recorded_by, reference_no || null, remarks || null, paid_at || null]);
 
-        res.status(201).json({ data: result.rows[0] });
+        const newPayment = result.rows[0];
+        notifyUsers({
+            targetRoles: ['admin', 'agent'],
+            projectId: newPayment.project_id,
+            title: `New Payment Recorded`,
+            body: `Accounts logged ₹${newPayment.amount} (${newPayment.payment_type?.replace(/_/g, ' ')}) for Project #${newPayment.project_id}.`
+        });
+
+        res.status(201).json({ data: newPayment });
     } catch (err) {
         if (err.code === "23503") {
             return res.status(400).json({ error: "Referenced project or user does not exist" });
@@ -175,6 +184,14 @@ export const updatePaymentStatus = async (req, res) => {
             return res.status(404).json({ error: "Payment not found" });
         }
 
+        const updatedPayment = result.rows[0];
+        notifyUsers({
+            targetRoles: ['admin', 'agent'],
+            projectId: updatedPayment.project_id,
+            title: `Payment ${status.toUpperCase()}`,
+            body: `Payment of ₹${updatedPayment.amount} status changed to ${status}.`
+        });
+
         res.status(200).json({ message: "Payment status updated", data: result.rows[0] });
     } catch (err) {
         if (err.code === "22P02") {
@@ -197,7 +214,7 @@ export const getPendingPayments = async (req, res) => {
                 pay.amount,
                 pay.status,
                 pay.recorded_by,
-                u.full_name AS recorded_by_name,
+                u.first_name || ' ' || u.last_name AS recorded_by_name,
                 pay.remarks,
                 pay.created_at
             FROM payments pay

@@ -165,7 +165,7 @@ const NewProjectPage = () => {
               <option value="">-- Select Site Manager --</option>
               {siteManagers.map((sm) => (
                 <option key={sm.id} value={sm.id}>
-                  Site Manager: {sm.full_name} ({sm.email || sm.phone || `ID: ${sm.id}`})
+                  Site Manager: {sm.first_name + " " + sm.last_name} ({sm.email || sm.phone || `ID: ${sm.id}`})
                 </option>
               ))}
             </select>

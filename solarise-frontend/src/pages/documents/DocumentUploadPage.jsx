@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentService, consumerService } from '../../services/api';
+import { documentService, consumerService, actionService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { ALL_DOCUMENT_TYPES } from '../../constants/documentTypes';
 
@@ -11,6 +11,8 @@ const DocumentUploadPage = () => {
   const [consumers, setConsumers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [flaggedDocs, setFlaggedDocs] = useState([]);
+  const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'resolve'
 
   const [form, setForm] = useState({
     consumer_id: '',
@@ -24,6 +26,7 @@ const DocumentUploadPage = () => {
 
   useEffect(() => {
     fetchConsumers();
+    fetchFlaggedDocs();
   }, []);
 
   const fetchConsumers = async () => {
@@ -36,6 +39,38 @@ const DocumentUploadPage = () => {
       }
     } catch (err) {
       console.warn('Error fetching consumers:', err);
+    }
+  };
+
+  const fetchFlaggedDocs = async () => {
+    try {
+      const [docsRes, actsRes] = await Promise.allSettled([
+        documentService.getAll(),
+        actionService.getAll(),
+      ]);
+
+      let list = [];
+      if (docsRes.status === 'fulfilled') {
+        list = docsRes.value.data?.data || docsRes.value.data || [];
+      }
+
+      let openActions = [];
+      if (actsRes.status === 'fulfilled') {
+        openActions = actsRes.value.data?.data || actsRes.value.data || [];
+      }
+
+      const flagged = list.filter(d => {
+        if (['action_required', 'rejected'].includes(d.status)) return true;
+        const hasOpenAct = openActions.some(a => 
+          String(a.consumer_id) === String(d.consumer_id) && 
+          !['resolved', 'cancelled'].includes(a.status)
+        );
+        return hasOpenAct;
+      });
+
+      setFlaggedDocs(flagged);
+    } catch (err) {
+      console.warn('Error fetching documents:', err);
     }
   };
 
@@ -89,18 +124,50 @@ const DocumentUploadPage = () => {
     }
   };
 
+  const matchingFlaggedDoc = flaggedDocs.find(
+    (d) => String(d.consumer_id) === String(form.consumer_id) && (d.doc_type === form.doc_type || !form.doc_type)
+  ) || flaggedDocs.find((d) => String(d.consumer_id) === String(form.consumer_id));
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-12">
+    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Upload Consumer Document</h1>
-          <p className="text-sm text-gray-500 mt-1">Record geotagged site photo or identity verification document</p>
+          <h1 className="text-2xl font-bold text-gray-900">Document Upload & Stepped Resolver Desk</h1>
+          <p className="text-sm text-gray-500 mt-1">Upload new consumer documents or resolve flagged document corrections</p>
         </div>
         <button
           onClick={() => navigate('/documents')}
           className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition"
         >
-          Cancel
+          ← Back to Documents
+        </button>
+      </div>
+
+      {/* Mode Switcher Tabs */}
+      <div className="flex items-center space-x-2 bg-gray-100 p-1.5 rounded-2xl border border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('upload')}
+          className={`flex-1 py-2.5 px-4 text-xs font-bold rounded-xl transition ${
+            activeTab === 'upload' ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Upload New Document
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('resolve')}
+          className={`flex-1 py-2.5 px-4 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 ${
+            activeTab === 'resolve' ? 'bg-white text-orange-800 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <span>Fix / Resolve Flagged Docs</span>
+          {flaggedDocs.length > 0 && (
+            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-orange-600 text-white rounded-full">
+              {flaggedDocs.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -110,27 +177,99 @@ const DocumentUploadPage = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-5">
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">Select Consumer *</label>
-          <select
-            name="consumer_id"
-            value={form.consumer_id}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2.5 rounded-xl border text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-          >
-            {consumers.length === 0 ? (
-              <option value="">No registered consumers found</option>
-            ) : (
-              consumers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_name} — Elec No: {c.electric_consumer_no || 'N/A'}
-                </option>
-              ))
-            )}
-          </select>
+      {/* Tab 2: Flagged Docs List for Resolution */}
+      {activeTab === 'resolve' && (
+        <div className="bg-white rounded-2xl border border-orange-200 p-5 shadow-sm space-y-4">
+          <div className="flex justify-between items-center border-b border-orange-100 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-orange-900">Flagged Documents Pending Correction ({flaggedDocs.length})</h2>
+              <p className="text-xs text-orange-700 mt-0.5">Select a document to launch the 4-step upload & verification resolver workflow.</p>
+            </div>
+          </div>
+
+          {flaggedDocs.length === 0 ? (
+            <div className="text-center py-8 text-xs text-gray-500">
+              No flagged documents requiring resolution right now.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {flaggedDocs.map((d) => (
+                <div key={d.id} className="p-4 bg-orange-50/50 rounded-xl border border-orange-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-gray-900">{d.consumer_name || `Consumer #${d.consumer_id}`}</span>
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-800 font-bold rounded text-[10px] capitalize">
+                        {d.status?.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mt-1 font-semibold">
+                      Category: <span className="text-purple-700 capitalize">{(d.doc_type || '').replace(/_/g, ' ')}</span> (v{d.version || 1})
+                    </p>
+                    {d.reject_reason && (
+                      <p className="text-rose-700 italic text-[11px] mt-1">Reason: "{d.reject_reason}"</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => navigate(`/documents/${d.id}/resolve`)}
+                    className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold text-xs rounded-xl hover:from-orange-700 hover:to-amber-700 transition shadow-sm shrink-0"
+                  >
+                    Launch Stepped Resolver →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Tab 1: Upload Form */}
+      {activeTab === 'upload' && (
+        <>
+          {/* Intelligent Flagged Warning Banner */}
+          {matchingFlaggedDoc && (
+            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <span className="font-bold text-amber-900 flex items-center space-x-1">
+                  <svg className="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.78-1.34-.25-2.864 1.018-3.836 1.306-1.016 2.888-.918 4.071-.345"/></svg>
+                  <span>Flagged Document Detected for this Consumer!</span>
+                </span>
+                <p className="text-amber-800 text-[11px]">
+                  Consumer <span className="font-semibold">{matchingFlaggedDoc.consumer_name}</span> has a document marked as{' '}
+                  <span className="font-bold uppercase text-orange-900">{matchingFlaggedDoc.status?.replace(/_/g, ' ')}</span> for{' '}
+                  <span className="font-semibold">{(matchingFlaggedDoc.doc_type || '').replace(/_/g, ' ')}</span>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(`/documents/${matchingFlaggedDoc.id}/resolve`)}
+                className="px-4 py-2 bg-orange-600 text-white font-bold text-xs rounded-xl hover:bg-orange-700 transition shadow-xs whitespace-nowrap shrink-0"
+              >
+                Fix via Stepped Resolver →
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Select Consumer *</label>
+              <select
+                name="consumer_id"
+                value={form.consumer_id}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2.5 rounded-xl border text-xs bg-white focus:ring-2 focus:ring-emerald-500 font-medium"
+              >
+                {consumers.length === 0 ? (
+                  <option value="">No registered consumers found</option>
+                ) : (
+                  consumers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name} — Elec No: {c.electric_consumer_no || 'N/A'}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -190,7 +329,7 @@ const DocumentUploadPage = () => {
               onClick={handleGetLocation}
               className="px-3 py-1 bg-amber-600 text-white text-[11px] font-semibold rounded-lg hover:bg-amber-700 transition"
             >
-              🎯 Auto-Detect My Location
+              Auto-Detect My Location
             </button>
           </div>
 
@@ -239,7 +378,9 @@ const DocumentUploadPage = () => {
           </button>
         </div>
       </form>
-    </div>
+    </>
+  )}
+</div>
   );
 };
 

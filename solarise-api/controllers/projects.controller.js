@@ -18,7 +18,7 @@ export const getAllProjects = async (req, res) => {
                 p.registration_no,
                 p.capacity_kw,
                 p.assigned_site_manager,
-                u.full_name AS site_manager_name,
+                u.first_name || ' ' || u.last_name AS site_manager_name,
                 p.created_at,
                 p.updated_at
             FROM projects p
@@ -98,7 +98,7 @@ export const getProjectsDashboard = async (req, res) => {
             GROUP BY p.current_status
             ORDER BY count DESC
         `;
-        
+
         const totalQuery = `
             SELECT COUNT(*)::INTEGER AS total 
             FROM projects p
@@ -133,7 +133,7 @@ export const getProjectsByStatus = async (req, res) => {
                 p.registration_no,
                 p.capacity_kw,
                 p.assigned_site_manager,
-                u.full_name AS site_manager_name,
+                u.first_name || ' ' || u.last_name AS site_manager_name,
                 p.created_at,
                 p.updated_at
             FROM projects p
@@ -166,7 +166,7 @@ export const getProjectById = async (req, res) => {
                 p.registration_no,
                 p.capacity_kw,
                 p.assigned_site_manager,
-                u.full_name AS site_manager_name,
+                u.first_name || ' ' || u.last_name AS site_manager_name,
                 u.email AS site_manager_email,
                 u.phone AS site_manager_phone,
                 p.created_at,
@@ -187,7 +187,7 @@ export const getProjectById = async (req, res) => {
                 sh.from_status,
                 sh.to_status,
                 sh.changed_by,
-                u.full_name AS changed_by_name,
+                u.first_name || ' ' || u.last_name AS changed_by_name,
                 sh.remarks,
                 sh.changed_at
             FROM status_history sh
@@ -221,10 +221,10 @@ export const createProject = async (req, res) => {
             VALUES ($1, $2, $3, $4, COALESCE($5, 'new_registration'::project_status))
             RETURNING *
         `, [
-            consumer_id, 
-            registration_no || null, 
-            capacity_kw || null, 
-            assigned_site_manager || null, 
+            consumer_id,
+            registration_no || null,
+            capacity_kw || null,
+            assigned_site_manager || null,
             current_status || 'new_registration'
         ]);
 

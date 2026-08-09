@@ -85,7 +85,7 @@ router.get("/", authenticateToken, authorizeRoles('admin', 'agent', 'site_manage
  *       201:
  *         description: Action created
  */
-router.post("/", authenticateToken, authorizeRoles('admin', 'site_manager', 'doc_team', 'accounts'), createAction);
+router.post("/", authenticateToken, authorizeRoles('admin', 'agent', 'site_manager', 'doc_team', 'accounts'), createAction);
 
 /**
  * @swagger

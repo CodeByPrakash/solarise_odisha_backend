@@ -135,7 +135,7 @@ router.post("/", authenticateToken, authorizeRoles('admin', 'doc_team', 'site_ma
  *       404:
  *         description: User not found
  */
-router.put("/:id", authenticateToken, authorizeRoles('admin', 'doc_team'), updateUser);
+router.put("/:id", authenticateToken, authorizeRoles('admin'), updateUser);
 
 /**
  * @swagger

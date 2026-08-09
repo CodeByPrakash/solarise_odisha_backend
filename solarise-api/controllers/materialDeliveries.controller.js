@@ -11,7 +11,7 @@ export const getDeliveryByProject = async (req, res) => {
                 md.delivered_at,
                 md.dcr_number,
                 md.recorded_by,
-                u.full_name AS recorded_by_name,
+                u.first_name || ' ' || u.last_name AS recorded_by_name,
                 c.full_name AS consumer_name,
                 p.current_status AS project_status
             FROM material_deliveries md
@@ -36,7 +36,7 @@ export const getDeliveryByProject = async (req, res) => {
 export const createDelivery = async (req, res) => {
     try {
         const { project_id, dcr_number, recorded_by, delivered_at } = req.body;
-        
+
         let recordedBy = recorded_by || req.user?.userId || req.user?.id;
         if (!recordedBy) {
             const defaultUser = await pool.query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
@@ -103,7 +103,7 @@ export const createDelivery = async (req, res) => {
         // Log status_history entry if status transitioned
         if (prevStatus !== 'materials_delivered') {
             await pool.query(`
-                INSERT INTO status_history (project_id, previous_status, new_status, changed_by, remarks)
+                INSERT INTO status_history (project_id, from_status, to_status, changed_by, remarks)
                 VALUES ($1, $2, 'materials_delivered', $3, $4)
             `, [project_id, prevStatus, recordedBy, `Material Delivery Batch Recorded (DCR: ${dcr_number || 'N/A'})`]);
         }
@@ -115,13 +115,13 @@ export const createDelivery = async (req, res) => {
             try {
                 const fallbackUser = await pool.query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
                 const safeUserId = fallbackUser.rows[0]?.id || 1;
-                
+
                 const retryResult = await pool.query(`
                     INSERT INTO material_deliveries (project_id, dcr_number, recorded_by, delivered_at)
                     VALUES ($1, $2, $3, COALESCE($4, now()))
                     RETURNING *
                 `, [req.body.project_id, req.body.dcr_number || null, safeUserId, req.body.delivered_at || null]);
-                
+
                 await pool.query(`
                     UPDATE projects
                     SET current_status = 'materials_delivered', updated_at = now()
