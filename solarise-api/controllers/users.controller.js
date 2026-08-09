@@ -4,7 +4,7 @@ import pool from "../config/db.js";
 export const getAllUsers = async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role, is_active, created_at FROM users ORDER BY id"
+            "SELECT id, first_name, last_name, email, phone, role, is_active, created_at FROM users ORDER BY id"
         );
         res.status(200).json({ count: result.rowCount, data: result.rows });
     } catch (err) {
@@ -17,7 +17,7 @@ export const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "SELECT id, full_name, email, phone,password_hash, role, is_active, created_at FROM users WHERE id = $1",
+            "SELECT id, first_name, last_name, email, phone,password_hash, role, is_active, created_at FROM users WHERE id = $1",
             [id]
         );
         if (result.rowCount === 0) {
@@ -32,9 +32,9 @@ export const getUserById = async (req, res) => {
 // POST /api/users
 export const createUser = async (req, res) => {
     try {
-        const { full_name, email, phone, role, password_hash } = req.body;
-        if (!full_name || !email || !phone || !password_hash) {
-            return res.status(400).json({ error: "full_name, email, phone, and password_hash are required" });
+        const { first_name, last_name, email, phone, role, password_hash } = req.body;
+        if (!first_name || !last_name || !email || !phone || !password_hash) {
+            return res.status(400).json({ error: "first_name, last_name, email, phone, and password_hash are required" });
         }
         // Check if email or phone already exists
         const existingUser = await pool.query(
@@ -45,9 +45,9 @@ export const createUser = async (req, res) => {
             return res.status(409).json({ error: "Phone number already exists" });
         }
         const result = await pool.query(
-            `INSERT INTO users (full_name, email, phone, role, password_hash)
-             VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, phone, role`,
-            [full_name, email, phone, role || "agent", password_hash]
+            `INSERT INTO users (first_name, last_name, email, phone, role, password_hash)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, first_name, last_name, email, phone, role`,
+            [first_name, last_name, email, phone, role || "agent", password_hash]
         );
         res.status(201).json({ data: result.rows[0] });
     } catch (err) {
@@ -63,11 +63,11 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { full_name, email, phone, role, is_active } = req.body;
+        const { first_name, last_name, email, phone, role, is_active } = req.body;
         const result = await pool.query(
-            `UPDATE users SET full_name=$1, email=$2, phone=$3, role=$4, is_active=$5, updated_at=now()
-             WHERE id=$6 RETURNING id, full_name, email, phone, role, is_active`,
-            [full_name, email, phone, role, is_active, id]
+            `UPDATE users SET first_name=$1, last_name=$2, email=$3, phone=$4, role=$5, is_active=$6, updated_at=now()
+             WHERE id=$7 RETURNING id, first_name, last_name, email, phone, role, is_active`,
+            [first_name, last_name, email, phone, role, is_active, id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: "User not found" });
@@ -83,7 +83,7 @@ export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "DELETE FROM users WHERE id = $1 RETURNING id, full_name",
+            "DELETE FROM users WHERE id = $1 RETURNING id, first_name, last_name",
             [id]
         );
         if (result.rowCount === 0) {
@@ -100,7 +100,7 @@ export const getUsersByRole = async (req, res) => {
     try {
         const { role } = req.params;
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role FROM users WHERE role = $1",
+            "SELECT id, first_name, last_name, email, phone, role FROM users WHERE role = $1",
             [role]
         );
         res.status(200).json({ count: result.rowCount, data: result.rows });

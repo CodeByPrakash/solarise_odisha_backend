@@ -1,17 +1,30 @@
 import pool from "../config/db.js";
+
 export const getAllConsumers = async (req, res) => {
     try {
         const userId = req.user?.userId || req.user?.id;
         const role = req.user?.role;
-        let query = "SELECT id, full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, created_at FROM consumers";
+
+        let query = "SELECT id, full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, is_active, created_by, created_at FROM consumers";
+        const conditions = [];
         const params = [];
 
+        // Regular roles (agent, site_manager, accounts) ONLY see active consumers (is_active = TRUE)
+        const canSeeInactive = ['admin', 'doc_team'].includes(role);
+        if (!canSeeInactive) {
+            conditions.push("is_active = TRUE");
+        }
+
         if (role === 'agent') {
-            query += " WHERE created_by = $1";
             params.push(userId);
+            conditions.push(`created_by = $${params.length}`);
         } else if (role === 'site_manager') {
-            query += " WHERE created_by = $1 OR id IN (SELECT consumer_id FROM projects WHERE assigned_site_manager = $1)";
             params.push(userId);
+            conditions.push(`(created_by = $${params.length} OR id IN (SELECT consumer_id FROM projects WHERE assigned_site_manager = $${params.length}))`);
+        }
+
+        if (conditions.length > 0) {
+            query += " WHERE " + conditions.join(" AND ");
         }
 
         query += " ORDER BY created_at DESC";
@@ -23,25 +36,10 @@ export const getAllConsumers = async (req, res) => {
     }
 };
 
-// export const getConsumerById = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const result = await pool.query(
-//             "SELECT full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, created_at FROM consumers WHERE id=$1", [id]
-//         );
-//         res.status(200).json({
-//             data: result.rows
-//         });
-//     } catch (error) {
-//         res.status(500).json({
-//             error: error.message
-//         });
-//     }
-// }
-
 export const getConsumerById = async (req, res) => {
     try {
         const { id } = req.params;
+        const role = req.user?.role;
         const result = await pool.query(
             `SELECT c.*,
               ab.id AS area_block_id,
@@ -56,7 +54,15 @@ export const getConsumerById = async (req, res) => {
             return res.status(404).json({ error: "Consumer not found" });
         }
 
-        res.status(200).json({ data: result.rows[0] });
+        const consumer = result.rows[0];
+
+        // Non-admin/doc_team cannot view deactivated consumers
+        const canSeeInactive = ['admin', 'doc_team'].includes(role);
+        if (!canSeeInactive && consumer.is_active === false) {
+            return res.status(403).json({ error: "Access denied. Consumer account is deactivated." });
+        }
+
+        res.status(200).json({ data: consumer });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -89,13 +95,17 @@ export const createConsumer = async (req, res) => {
             occupation,
             created_by
         } = req.body;
+
+        const effectiveCreatedBy = created_by || req.user?.userId || req.user?.id || 1;
+
         const result = await pool.query(
             `WITH inserted_consumer AS (
-                INSERT INTO consumers (full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+                INSERT INTO consumers (full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, is_active)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23, TRUE)
                 RETURNING *
             )
-            SELECT i.full_name,
+            SELECT i.id,
+                   i.full_name,
                    i.address,
                    ab.id AS area_block_id,
                    ab.name AS area_block_name,
@@ -118,10 +128,11 @@ export const createConsumer = async (req, res) => {
                    i.payment_mode,
                    i.land_owned_by_consumer,
                    i.occupation,
+                   i.is_active,
                    i.created_by
             FROM inserted_consumer i
             LEFT JOIN area_blocks ab ON i.area_block_id = ab.id`,
-            [full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by]
+            [full_name, address, area_block_id || 1, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, effectiveCreatedBy]
         );
         res.status(200).json({
             data: result.rows[0]
@@ -131,7 +142,7 @@ export const createConsumer = async (req, res) => {
             error: error.message
         });
     }
-}
+};
 
 export const updateConsumer = async (req, res) => {
     try {
@@ -199,7 +210,7 @@ export const updateConsumer = async (req, res) => {
             [
                 full_name,
                 address,
-                area_block_id,
+                area_block_id || 1,
                 email,
                 phone_primary,
                 phone_secondary,
@@ -233,18 +244,45 @@ export const updateConsumer = async (req, res) => {
     }
 };
 
-export const deleteConsumer = async (req, res) => {
+// Deactivate Consumer (Sets is_active = FALSE)
+export const deactivateConsumer = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "DELETE FROM consumers WHERE id = $1 RETURNING id, full_name",
+            "UPDATE consumers SET is_active = FALSE, updated_at = NOW() WHERE id = $1 RETURNING id, full_name, is_active",
             [id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: "Consumer not found" });
         }
-        res.status(200).json({ message: "Consumer deleted", data: result.rows[0] });
+        res.status(200).json({
+            message: "Consumer deactivated. Record preserved in database.",
+            data: result.rows[0]
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
+
+// Activate Consumer (Sets is_active = TRUE)
+export const activateConsumer = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "UPDATE consumers SET is_active = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, full_name, is_active",
+            [id]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Consumer not found" });
+        }
+        res.status(200).json({
+            message: "Consumer activated successfully.",
+            data: result.rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteConsumer = deactivateConsumer;
+export const restoreConsumer = activateConsumer;

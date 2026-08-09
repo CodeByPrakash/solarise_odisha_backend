@@ -7,9 +7,9 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "8h";
 
 export const register = async (req, res) => {
     try {
-        const { full_name, email, phone, role, password } = req.body;
-        if (!full_name || !email || !phone || !password) {
-            return res.status(400).json({ error: "full_name, email, phone, and password are required" });
+        const { first_name, last_name, email, phone, role, password } = req.body;
+        if (!first_name || !last_name || !email || !phone || !password) {
+            return res.status(400).json({ error: "first_name, last_name, email, phone, and password are required" });
         }
 
         const existingUser = await pool.query(
@@ -22,15 +22,15 @@ export const register = async (req, res) => {
 
         const password_hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
-            `INSERT INTO users (full_name, email, phone, role, password_hash)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, full_name, email, phone, role, is_active, created_at`,
-            [full_name, email, phone, role || "agent", password_hash]
+            `INSERT INTO users (first_name, last_name, email, phone, role, password_hash)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, first_name, last_name, email, phone, role, is_active, created_at`,
+            [first_name, last_name, email, phone, role || "agent", password_hash]
         );
 
         const user = result.rows[0];
-        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-        res.status(201).json({ data: { user, token } });
+        // const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        res.status(201).json({ data: { user } }); //token } });
     } catch (err) {
         if (err.code === "23505") {
             return res.status(409).json({ error: "Email or phone already exists" });
@@ -48,7 +48,7 @@ export const login = async (req, res) => {
         }
 
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role, password_hash, is_active FROM users WHERE email = $1 OR phone = $1",
+            "SELECT id, first_name, last_name, email, phone, role, password_hash, is_active FROM users WHERE email = $1 OR phone = $1",
             [loginId]
         );
         if (result.rowCount === 0) {
@@ -80,7 +80,8 @@ export const login = async (req, res) => {
             data: {
                 user: {
                     id: user.id,
-                    full_name: user.full_name,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
                     email: user.email,
                     phone: user.phone,
                     role: user.role,
@@ -98,7 +99,7 @@ export const getProfile = async (req, res) => {
     try {
         const { userId } = req.user;
         const result = await pool.query(
-            "SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = $1",
+            "SELECT id, first_name, last_name, email, phone, role, is_active, created_at FROM users WHERE id = $1",
             [userId]
         );
         if (result.rowCount === 0) {
