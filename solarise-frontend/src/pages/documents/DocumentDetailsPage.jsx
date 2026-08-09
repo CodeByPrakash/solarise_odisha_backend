@@ -24,6 +24,12 @@ const DocumentDetailsPage = () => {
   const [reuploadUrl, setReuploadUrl] = useState('');
   const [reuploading, setReuploading] = useState(false);
 
+  // Flag document state
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagActionType, setFlagActionType] = useState('electric_bill_name_correction');
+  const [flagReason, setFlagReason] = useState('');
+  const [flagging, setFlagging] = useState(false);
+
   useEffect(() => {
     fetchDocumentDetails();
   }, [id]);
@@ -94,6 +100,26 @@ const DocumentDetailsPage = () => {
     }
   };
 
+  const handleFlagSubmit = async (e) => {
+    e.preventDefault();
+    if (!flagReason) return;
+    try {
+      setFlagging(true);
+      await documentService.flag(id, {
+        flagged_by: user?.id || 1,
+        action_type: flagActionType,
+        detail: flagReason,
+      });
+      setShowFlagModal(false);
+      setFlagReason('');
+      await fetchDocumentDetails();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Flagging document failed');
+    } finally {
+      setFlagging(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -114,19 +140,21 @@ const DocumentDetailsPage = () => {
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
         <div>
-          <div className="flex items-center space-x-3">
-            <span className="text-xs font-mono uppercase px-2.5 py-1 bg-purple-50 text-purple-700 rounded-md font-bold">
-              {(document.doc_type || 'document').replace(/_/g, ' ')}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-mono uppercase px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md font-bold">
+              {document.doc_type}
             </span>
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize ${
+            <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full capitalize ${
               document.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-              document.status === 'rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+              document.status === 'action_required' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+              document.status === 'rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+              'bg-amber-100 text-amber-800 border border-amber-200'
             }`}>
-              Status: {document.status}
+              {document.status?.replace(/_/g, ' ')}
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">
@@ -137,22 +165,38 @@ const DocumentDetailsPage = () => {
           </p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center space-x-3">
-          {document.status === 'uploaded' && (
+          {(document.status === 'uploaded' || document.status === 'action_required') && (
             <RoleGuard allowedRoles={['doc_team', 'admin']}>
               <button
                 onClick={handleVerify}
                 disabled={verifying}
                 className="px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
               >
-                {verifying ? 'Verifying...' : '✓ Verify Document'}
+                {verifying ? 'Verifying...' : 'Verify Document'}
               </button>
               <button
                 onClick={() => setShowRejectModal(true)}
                 className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl hover:bg-rose-700 transition shadow-sm"
               >
-                ✕ Reject Document
+                Reject Document
               </button>
             </RoleGuard>
+          )}
+          <RoleGuard allowedRoles={['doc_team', 'admin', 'site_manager']}>
+            <button
+              onClick={() => setShowFlagModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold rounded-xl hover:from-orange-600 hover:to-amber-600 transition shadow-sm"
+            >
+              Flag Document
+            </button>
+          </RoleGuard>
+          {(document.status === 'action_required' || document.status === 'rejected') && (
+            <button
+              onClick={() => navigate(`/documents/${id}/resolve`)}
+              className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white text-xs font-bold rounded-xl hover:from-orange-700 hover:to-amber-700 transition shadow-sm flex items-center space-x-1"
+            >
+              <span>Stepped Resolution Workflow</span>
+            </button>
           )}
           <button
             onClick={() => setShowReuploadModal(true)}
@@ -250,7 +294,7 @@ const DocumentDetailsPage = () => {
                 rel="noreferrer"
                 className="mt-2 block text-center py-2 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition"
               >
-                🗺️ View Location on Google Maps
+                View Location on Google Maps
               </a>
             </div>
           ) : (
@@ -330,6 +374,65 @@ const DocumentDetailsPage = () => {
                   className="px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50"
                 >
                   {reuploading ? 'Uploading...' : 'Re-upload Document'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Flag Document */}
+      {showFlagModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Flag Document for Correction</h3>
+            <p className="text-xs text-gray-500">
+              Flagging this document will set its status to <span className="font-bold text-orange-600">Action Required</span> and automatically create an open action item.
+            </p>
+
+            <form onSubmit={handleFlagSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Action Type / Correction Category *</label>
+                <select
+                  value={flagActionType}
+                  onChange={(e) => setFlagActionType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-800"
+                >
+                  <option value="electric_bill_name_correction">Electric Bill Name Correction</option>
+                  <option value="bank_passbook_name_correction">Bank Passbook Name Correction</option>
+                  <option value="bank_passbook_update">Bank Passbook Update</option>
+                  <option value="ownership_transfer">Ownership Transfer (Land RoR)</option>
+                  <option value="commercial_to_domestic">Commercial to Domestic Conversion</option>
+                  <option value="other">Other Issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Flag Details / Reason *</label>
+                <textarea
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  required
+                  rows={3}
+                  placeholder="Specify the issue (e.g., Name mismatch on electric bill, unclear scan)..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-800 focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFlagModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={flagging}
+                  className="px-4 py-2 bg-orange-600 text-white text-xs font-semibold rounded-xl hover:bg-orange-700 disabled:opacity-50 transition shadow-sm"
+                >
+                  {flagging ? 'Flagging...' : 'Confirm Flag Document'}
                 </button>
               </div>
             </form>

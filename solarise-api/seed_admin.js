@@ -6,8 +6,8 @@ async function seedAdmin() {
     const hash = await bcrypt.hash('admin123', 10);
     // Update or Insert admin user
     await pool.query(
-      `INSERT INTO users (full_name, email, phone, role, password_hash, is_active)
-       VALUES ('Omprakash', 'admin@solarise.com', '9876543210', 'admin', $1, true)
+      `INSERT INTO users (first_name, last_name, email, phone, role, password_hash, is_active)
+       VALUES ('Omprakash', 'Behera', 'admin@solarise.com', '7205252871', 'admin', $1, true)
        ON CONFLICT (email) DO UPDATE SET password_hash = $1, is_active = true`,
       [hash]
     );

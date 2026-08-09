@@ -48,7 +48,10 @@ export const userService = {
 // Area Blocks Service
 export const areaBlockService = {
   getAll: () => api.get('/areaBlocks'),
+  getById: (id) => api.get(`/areaBlocks/${id}`),
   create: (data) => api.post('/areaBlocks', data),
+  update: (id, data) => api.put(`/areaBlocks/${id}`, data),
+  delete: (id) => api.delete(`/areaBlocks/${id}`),
 };
 
 // Consumer Service
@@ -82,6 +85,7 @@ export const documentService = {
   verify: (id, data) => api.patch(`/documents/${id}/verify`, data),
   reject: (id, data) => api.patch(`/documents/${id}/reject`, data),
   reupload: (id, data) => api.post(`/documents/${id}/reupload`, data),
+  flag: (id, data) => api.post(`/documents/${id}/flag`, data),
 };
 
 // Bank Loans Service
@@ -93,6 +97,8 @@ export const bankLoanService = {
 // Actions Required Service
 export const actionService = {
   getAll: () => api.get('/actions'),
+  getByProject: (projectId) => api.get(`/actions/project/${projectId}`),
+  getOverdue: () => api.get('/actions/overdue'),
   create: (data) => api.post('/actions', data),
   updateStatus: (id, data) => api.patch(`/actions/${id}/status`, data),
   resolve: (id, data) => api.patch(`/actions/${id}/status`, { status: 'resolved', ...data }),

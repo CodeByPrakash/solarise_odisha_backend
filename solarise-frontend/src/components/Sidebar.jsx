@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const roleColorMap = {
@@ -11,8 +11,18 @@ const roleColorMap = {
 };
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const role = user?.role || 'agent';
+  const firstName = user?.first_name || (user?.full_name ? user.full_name.split(' ')[0] : '') || user?.firstName || 'User';
+  const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.full_name || user?.firstName || 'Authorized User';
+  const firstLetter = (firstName || 'U').charAt(0).toUpperCase();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const getMenuItems = () => {
     const allItems = [
@@ -21,6 +31,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Consumers', path: '/consumers', roles: ['admin', 'agent', 'doc_team'], icon: '👤' },
       { name: 'Documents Desk', path: '/documents', roles: ['admin', 'doc_team', 'site_manager'], icon: '📄' },
       { name: 'Payments & Subsidies', path: '/payments', roles: ['admin', 'accounts'], icon: '💳' },
+      { name: 'Area Blocks', path: '/area-blocks', roles: ['admin', 'agent', 'site_manager', 'doc_team', 'accounts'], icon: '🗺️' },
+      { name: 'User Management', path: '/users', roles: ['admin', 'doc_team', 'site_manager', 'accounts', 'agent'], icon: '👥' },
     ];
 
     if (role === 'admin') return allItems;
@@ -82,19 +94,33 @@ const Sidebar = ({ isOpen, onClose }) => {
         </nav>
       </div>
 
-      {/* User Account / Role Card */}
+      {/* User Account / Role Card with First Letter Logo & Logout Icon */}
       <div className="p-4 border-t border-slate-100 bg-slate-50/50">
         <div className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-2xs shrink-0">
-              {(user?.full_name || user?.firstName || 'U').charAt(0).toUpperCase()}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="h-9 w-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-extrabold text-sm shadow-2xs shrink-0 font-mono">
+                {firstLetter}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-extrabold text-slate-900 truncate" title={fullName}>
+                  {firstName}
+                </p>
+                <span className={`inline-block px-2 py-0.5 mt-0.5 text-[9px] font-extrabold rounded-full border uppercase tracking-wider ${roleColorMap[role] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                  {role.replace(/_/g, ' ')}
+                </span>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-extrabold text-slate-900 truncate">{user?.full_name || user?.firstName || 'Authorized User'}</p>
-              <span className={`inline-block px-2 py-0.5 mt-0.5 text-[9px] font-extrabold rounded-full border capitalize uppercase ${roleColorMap[role] || 'bg-slate-100 text-slate-700'}`}>
-                {role.replace(/_/g, ' ')}
-              </span>
-            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0 border border-transparent hover:border-rose-100"
+              title="Logout from portal"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>

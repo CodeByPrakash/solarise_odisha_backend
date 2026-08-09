@@ -7,6 +7,7 @@ import {
     verifyDocument,
     rejectDocument,
     reuploadDocument,
+    flagDocument,
     getDocumentStatusSummary,
 } from "../controllers/documents.controller.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
@@ -178,5 +179,7 @@ router.patch("/:id/reject", authenticateToken, authorizeRoles('admin', 'doc_team
  *         description: Document re-uploaded
  */
 router.post("/:id/reupload", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), reuploadDocument);
+router.post("/:id/flag", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), flagDocument);
+router.patch("/:id/flag", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), flagDocument);
 
 export default router;

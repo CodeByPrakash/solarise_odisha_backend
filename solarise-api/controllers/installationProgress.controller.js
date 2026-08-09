@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { notifyUsers } from "../utils/notificationHelper.js";
 
 // Hardcoded weights (must sum to 100)
 const INSTALLATION_ITEMS = [
@@ -26,7 +27,7 @@ export const getChecklistByProject = async (req, res) => {
                 ip.weight_pct,
                 ip.is_done,
                 ip.done_by,
-                u.full_name AS done_by_name,
+                u.first_name || ' ' || u.last_name AS done_by_name,
                 ip.done_at
             FROM installation_progress ip
             LEFT JOIN users u ON ip.done_by = u.id
@@ -130,7 +131,15 @@ export const completeItem = async (req, res) => {
             return res.status(404).json({ error: "Installation item not found" });
         }
 
-        res.status(200).json({ message: `Item marked as ${targetState ? 'complete' : 'pending'}`, data: result.rows[0] });
+        const updatedItem = result.rows[0];
+        notifyUsers({
+            targetRoles: ['admin', 'doc_team'],
+            projectId: updatedItem.project_id,
+            title: `Installation Item ${targetState ? 'Completed' : 'Pending'}`,
+            body: `Milestone "${updatedItem.item.replace(/_/g, ' ')}" updated for Project #${updatedItem.project_id}.`
+        });
+
+        res.status(200).json({ message: `Item marked as ${targetState ? 'complete' : 'pending'}`, data: updatedItem });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -232,7 +241,7 @@ export const saveChecklistBatch = async (req, res) => {
                 ip.weight_pct,
                 ip.is_done,
                 ip.done_by,
-                u.full_name AS done_by_name,
+                u.first_name || ' ' || u.last_name AS done_by_name,
                 ip.done_at
             FROM installation_progress ip
             LEFT JOIN users u ON ip.done_by = u.id

@@ -12,9 +12,12 @@ import NewConsumerPage from './pages/consumers/NewConsumerPage';
 import DocumentsPage from './pages/documents/DocumentsPage';
 import DocumentUploadPage from './pages/documents/DocumentUploadPage';
 import DocumentDetailsPage from './pages/documents/DocumentDetailsPage';
+import DocumentResolvePage from './pages/documents/DocumentResolvePage';
 import PaymentsPage from './pages/payments/PaymentsPage';
 import NewPaymentPage from './pages/payments/NewPaymentPage';
 import PaymentDetailsPage from './pages/payments/PaymentDetailsPage';
+import UsersPage from './pages/users/UsersPage';
+import AreaBlocksPage from './pages/areaBlocks/AreaBlocksPage';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -53,9 +56,12 @@ function App() {
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="documents/upload" element={<DocumentUploadPage />} />
           <Route path="documents/:id" element={<DocumentDetailsPage />} />
+          <Route path="documents/:id/resolve" element={<DocumentResolvePage />} />
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="payments/new" element={<NewPaymentPage />} />
           <Route path="payments/:id" element={<PaymentDetailsPage />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="area-blocks" element={<AreaBlocksPage />} />
         </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

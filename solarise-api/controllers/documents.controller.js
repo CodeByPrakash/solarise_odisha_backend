@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { notifyUsers } from "../utils/notificationHelper.js";
 
 // GET /api/documents - List all documents (filtered by role)
 export const getAllDocuments = async (req, res) => {
@@ -18,10 +19,10 @@ export const getAllDocuments = async (req, res) => {
                 d.geo_lng,
                 d.status,
                 d.uploaded_by,
-                u1.full_name AS uploaded_by_name,
+                u1.first_name || ' ' || u1.last_name AS uploaded_by_name,
                 d.uploaded_at,
                 d.verified_by,
-                u2.full_name AS verified_by_name,
+                u2.first_name || ' ' || u2.last_name AS verified_by_name,
                 d.verified_at,
                 d.reject_reason,
                 d.version
@@ -64,10 +65,10 @@ export const getDocumentById = async (req, res) => {
                 d.geo_lng,
                 d.status,
                 d.uploaded_by,
-                u1.full_name AS uploaded_by_name,
+                u1.first_name || ' ' || u1.last_name AS uploaded_by_name,
                 d.uploaded_at,
                 d.verified_by,
-                u2.full_name AS verified_by_name,
+                u2.first_name || ' ' || u2.last_name AS verified_by_name,
                 d.verified_at,
                 d.reject_reason,
                 d.version
@@ -103,10 +104,10 @@ export const getDocumentsByConsumer = async (req, res) => {
                 d.geo_lng,
                 d.status,
                 d.uploaded_by,
-                u1.full_name AS uploaded_by_name,
+                u1.first_name || ' ' || u1.last_name AS uploaded_by_name,
                 d.uploaded_at,
                 d.verified_by,
-                u2.full_name AS verified_by_name,
+                u2.first_name || ' ' || u2.last_name AS verified_by_name,
                 d.verified_at,
                 d.reject_reason,
                 d.version
@@ -151,8 +152,8 @@ export const verifyDocument = async (req, res) => {
         }
         const result = await pool.query(`
             UPDATE documents
-            SET status = 'verified', verified_by = $1, verified_at = now()
-            WHERE id = $2 AND status = 'uploaded'
+            SET status = 'verified', verified_by = $1, verified_at = now(), reject_reason = NULL
+            WHERE id = $2 AND status IN ('uploaded', 'action_required', 'rejected')
             RETURNING *
         `, [verified_by, id]);
         if (result.rowCount === 0) {
@@ -161,9 +162,18 @@ export const verifyDocument = async (req, res) => {
             if (check.rowCount === 0) {
                 return res.status(404).json({ error: "Document not found" });
             }
-            return res.status(400).json({ error: `Cannot verify document with status '${check.rows[0].status}'` });
+            return res.status(400).json({ error: `Cannot verify document with status '${check.rows[0].status}'.` });
         }
-        res.status(200).json({ message: "Document verified", data: result.rows[0] });
+
+        const verifiedDoc = result.rows[0];
+        notifyUsers({
+            targetRoles: ['admin', 'site_manager', 'agent'],
+            userId: verifiedDoc.uploaded_by,
+            title: `Document Verified`,
+            body: `Document "${verifiedDoc.doc_type?.replace(/_/g, ' ')}" verified by Document Desk.`
+        });
+
+        res.status(200).json({ message: "Document verified", data: verifiedDoc });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -182,7 +192,7 @@ export const rejectDocument = async (req, res) => {
         const result = await pool.query(`
             UPDATE documents
             SET status = 'rejected', verified_by = $1, verified_at = now(), reject_reason = $2
-            WHERE id = $3 AND status = 'uploaded'
+            WHERE id = $3 AND status IN ('uploaded', 'action_required', 'rejected')
             RETURNING * 
         `, [verified_by, reject_reason, id]);
         if (result.rowCount === 0) {
@@ -190,9 +200,18 @@ export const rejectDocument = async (req, res) => {
             if (check.rowCount === 0) {
                 return res.status(404).json({ error: "Document not found" });
             }
-            return res.status(400).json({ error: `Cannot reject document with status '${check.rows[0].status}'` });
+            return res.status(400).json({ error: `Cannot reject document with status '${check.rows[0].status}'. Only 'uploaded' or 'action_required' documents can be rejected.` });
         }
-        res.status(200).json({ message: "Document rejected", data: result.rows[0] });
+
+        const rejectedDoc = result.rows[0];
+        notifyUsers({
+            targetRoles: ['admin', 'site_manager', 'agent'],
+            userId: rejectedDoc.uploaded_by,
+            title: `Document Rejected`,
+            body: `Document "${rejectedDoc.doc_type?.replace(/_/g, ' ')}" rejected. Reason: ${reject_reason}`
+        });
+
+        res.status(200).json({ message: "Document rejected", data: rejectedDoc });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -259,5 +278,136 @@ export const getDocumentStatusSummary = async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+export const flagDocument = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { flagged_by, action_type, detail } = req.body;
+
+        if (!detail) {
+            return res.status(400).json({ error: "detail (flag reason) is required" });
+        }
+
+        await client.query("BEGIN");
+
+        // 1. Get document & project info
+        const docRes = await client.query(`
+            SELECT d.id, d.consumer_id, d.doc_type, p.id AS project_id, p.current_status
+            FROM documents d
+            LEFT JOIN projects p ON p.consumer_id = d.consumer_id
+            WHERE d.id = $1
+        `, [id]);
+
+        if (docRes.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Document not found" });
+        }
+
+        const doc = docRes.rows[0];
+
+        // Ensure valid user ID for FK constraint
+        let validUserBy = req.user?.userId || req.user?.id || flagged_by;
+        if (validUserBy) {
+            const uCheck = await client.query("SELECT id FROM users WHERE id = $1", [validUserBy]);
+            if (uCheck.rowCount === 0) {
+                const fallbackUser = await client.query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+                validUserBy = fallbackUser.rows[0]?.id || 1;
+            }
+        } else {
+            const fallbackUser = await client.query("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+            validUserBy = fallbackUser.rows[0]?.id || 1;
+        }
+
+        const VALID_ACTION_TYPES = [
+            'electric_bill_name_correction',
+            'ownership_transfer',
+            'commercial_to_domestic',
+            'bank_passbook_name_correction',
+            'bank_passbook_update',
+            'other'
+        ];
+
+        let finalActionType = action_type;
+        if (!finalActionType || !VALID_ACTION_TYPES.includes(finalActionType)) {
+            if (doc.doc_type === 'electric_bill') finalActionType = 'electric_bill_name_correction';
+            else if (doc.doc_type === 'bank_passbook') finalActionType = 'bank_passbook_name_correction';
+            else if (['land_ror', 'aadhaar_card'].includes(doc.doc_type)) finalActionType = 'ownership_transfer';
+            else finalActionType = 'other';
+        }
+
+        // 2. Update document status to 'action_required'
+        const updatedDoc = await client.query(`
+            UPDATE documents
+            SET status = 'action_required', reject_reason = $1
+            WHERE id = $2
+            RETURNING *
+        `, [detail, id]);
+
+        // 3. Create entry in action_required if project exists
+        let actionItem = null;
+        if (doc.project_id) {
+            const actionRes = await client.query(`
+                INSERT INTO action_required (project_id, action_type, detail, raised_by, status)
+                VALUES ($1, $2, $3, $4, 'open')
+                RETURNING *
+            `, [doc.project_id, finalActionType, detail, validUserBy]);
+            actionItem = actionRes.rows[0];
+
+            // 4. Update project current_status to 'action_required'
+            await client.query(`
+                UPDATE projects
+                SET current_status = 'action_required', updated_at = now()
+                WHERE id = $1
+            `, [doc.project_id]);
+
+            // 5. Record in status_history
+            const VALID_PROJECT_STATUSES = [
+                'new_registration', 'doc_requested', 'doc_uploaded', 'doc_verified', 'action_required',
+                'action_required_bank', 'work_in_progress', 'processing_fee_paid', 'registration_no_generated',
+                'master_data_pending', 'name_corrected', 'ownership_changed', 'type_converted',
+                'pending_with_discom', 'security_deposit_pending', 'security_deposit_paid', 'psa_agreement_done',
+                'pmsgy_done', 'loan_applied', 'loan_approved', 'loan_rejected', 'line_up_given',
+                'materials_delivered', 'installation_in_progress', 'installation_done', 'installation_uploaded_pmsgy',
+                'net_metering_applied', 'net_metering_rts_pending', 'net_metering_payment_pending',
+                'net_metering_agreement_done', 'inspection_report_submitted', 'site_activity', 'approval_desk',
+                'service_release', 'service_released', 'meter_installed', 'project_commissioned',
+                'subsidy_redeemed', 'subsidy_return', 'subsidy_pending', 'subsidy_disbursed_cfa',
+                'subsidy_disbursed_sfa', 'project_handover_pending', 'project_handed_over'
+            ];
+            const fromStatus = (doc.current_status && VALID_PROJECT_STATUSES.includes(doc.current_status)) ? doc.current_status : null;
+
+            await client.query(`
+                INSERT INTO status_history (project_id, from_status, to_status, changed_by, remarks)
+                VALUES ($1, $2, 'action_required', $3, $4)
+            `, [doc.project_id, fromStatus, validUserBy, `Document Flagged: ${detail}`]);
+        }
+
+        await client.query("COMMIT");
+
+        try {
+            notifyUsers({
+                targetRoles: ['admin', 'agent', 'doc_team', 'site_manager'],
+                projectId: doc.project_id || null,
+                title: `Document Flagged: ${doc.doc_type?.replace(/_/g, ' ')}`,
+                body: `Flagged by Document Desk. Reason: ${detail}`
+            });
+        } catch { /* notification catch */ }
+
+        res.status(200).json({
+            message: "Document successfully flagged for correction",
+            data: {
+                document: updatedDoc.rows[0],
+                action: actionItem
+            }
+        });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("Error in flagDocument:", err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 };

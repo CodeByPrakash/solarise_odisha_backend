@@ -25,9 +25,15 @@ const DocumentsPage = () => {
   // Quick Reject Modal
   const [rejectingDoc, setRejectingDoc] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Quick Flag Modal
+  const [flaggingDoc, setFlaggingDoc] = useState(null);
+  const [flagActionType, setFlagActionType] = useState('electric_bill_name_correction');
+  const [flagReason, setFlagReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   const canVerify = ['admin', 'doc_team'].includes(user?.role);
+  const canFlag = ['admin', 'doc_team', 'site_manager'].includes(user?.role);
 
   useEffect(() => {
     fetchDocumentsData();
@@ -76,15 +82,36 @@ const DocumentsPage = () => {
     }
   };
 
-  const handleQuickResolveAction = async (actionId) => {
-    try {
-      setActionLoading(true);
-      await actionService.resolve(actionId, { resolved_by: user?.id || 1 });
-      await fetchDocumentsData();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to resolve action');
-    } finally {
-      setActionLoading(false);
+  const handleOpenResolverForAction = (act) => {
+    let targetDocType = null;
+    if (act.action_type === 'electric_bill_name_correction') targetDocType = 'electric_bill';
+    else if (['bank_passbook_name_correction', 'bank_passbook_update'].includes(act.action_type)) targetDocType = 'bank_passbook';
+    else if (act.action_type === 'ownership_transfer') targetDocType = 'land_ror';
+
+    let match = documents.find(d => 
+      (act.consumer_id ? d.consumer_id === act.consumer_id : true) && 
+      (targetDocType ? d.doc_type === targetDocType : true) &&
+      ['action_required', 'rejected', 'uploaded'].includes(d.status)
+    );
+
+    if (!match && act.consumer_id) {
+      match = documents.find(d => d.consumer_id === act.consumer_id && ['action_required', 'rejected'].includes(d.status));
+    }
+
+    if (!match && targetDocType) {
+      match = documents.find(d => d.doc_type === targetDocType);
+    }
+
+    if (!match && act.consumer_id) {
+      match = documents.find(d => d.consumer_id === act.consumer_id);
+    }
+
+    if (match) {
+      navigate(`/documents/${match.id}/resolve`);
+    } else if (documents.length > 0) {
+      navigate(`/documents/${documents[0].id}/resolve`);
+    } else {
+      navigate('/documents/upload');
     }
   };
 
@@ -102,6 +129,26 @@ const DocumentsPage = () => {
       await fetchDocumentsData();
     } catch (err) {
       alert(err.response?.data?.error || 'Rejection failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickFlagSubmit = async (e) => {
+    e.preventDefault();
+    if (!flaggingDoc || !flagReason) return;
+    try {
+      setActionLoading(true);
+      await documentService.flag(flaggingDoc.id, {
+        flagged_by: user?.id || 1,
+        action_type: flagActionType,
+        detail: flagReason,
+      });
+      setFlaggingDoc(null);
+      setFlagReason('');
+      await fetchDocumentsData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Flagging document failed');
     } finally {
       setActionLoading(false);
     }
@@ -260,13 +307,12 @@ const DocumentsPage = () => {
                 <p className="text-gray-600 text-[11px] line-clamp-2">{act.detail || 'Correction detail requested'}</p>
                 <div className="pt-2 border-t flex justify-between items-center text-[11px]">
                   <span className="text-gray-400">Raised: {act.raised_by_name || 'Doc Team'}</span>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <button
-                      onClick={() => handleQuickResolveAction(act.id)}
-                      disabled={actionLoading}
-                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition disabled:opacity-50"
+                      onClick={() => handleOpenResolverForAction(act)}
+                      className="px-2.5 py-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-[10px] rounded-lg transition shadow-xs flex items-center space-x-1"
                     >
-                      ✓ Resolve
+                      <span>Stepped Resolve</span>
                     </button>
                     <button
                       onClick={() => navigate(`/projects/${act.project_id}`)}
@@ -337,7 +383,8 @@ const DocumentsPage = () => {
                   <Table.Cell className="text-xs font-mono">
                     {doc.geo_lat && doc.geo_lng ? (
                       <span className="text-amber-700 font-bold flex items-center space-x-1">
-                        <span>🎯 {parseFloat(doc.geo_lat).toFixed(3)}, {parseFloat(doc.geo_lng).toFixed(3)}</span>
+                        <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span>{parseFloat(doc.geo_lat).toFixed(3)}, {parseFloat(doc.geo_lng).toFixed(3)}</span>
                       </span>
                     ) : (
                       <span className="text-gray-400">No Geotag</span>
@@ -363,21 +410,38 @@ const DocumentsPage = () => {
                       >
                         View
                       </Button>
-                      {canVerify && doc.status === 'uploaded' && (
+                      {(doc.status === 'action_required' || doc.status === 'rejected') && (
+                        <button
+                          onClick={() => navigate(`/documents/${doc.id}/resolve`)}
+                          className="px-2 py-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-[11px] font-bold rounded-lg transition shadow-xs"
+                        >
+                          Resolve
+                        </button>
+                      )}
+                      {canFlag && doc.status !== 'action_required' && (
+                        <button
+                          onClick={() => setFlaggingDoc(doc)}
+                          disabled={actionLoading}
+                          className="px-2 py-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-[11px] font-bold rounded-lg transition shadow-xs"
+                        >
+                          Flag
+                        </button>
+                      )}
+                      {canVerify && (doc.status === 'uploaded' || doc.status === 'action_required') && (
                         <>
                           <button
                             onClick={() => handleQuickVerify(doc.id)}
                             disabled={actionLoading}
                             className="px-2 py-1 bg-emerald-600 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition"
                           >
-                            ✓ Verify
+                            Verify
                           </button>
                           <button
                             onClick={() => setRejectingDoc(doc)}
                             disabled={actionLoading}
                             className="px-2 py-1 bg-rose-600 text-white text-[11px] font-semibold rounded-lg hover:bg-rose-700 disabled:opacity-50 transition"
                           >
-                            ✕ Reject
+                            Reject
                           </button>
                         </>
                       )}
@@ -436,6 +500,75 @@ const DocumentsPage = () => {
                   className="px-5 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl hover:bg-rose-700 disabled:opacity-50 transition"
                 >
                   {actionLoading ? 'Rejecting...' : 'Confirm Rejection'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Flag Modal */}
+      {flaggingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-200 p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-bold text-gray-900 text-base">Flag Document for Correction</h3>
+              <button
+                onClick={() => setFlaggingDoc(null)}
+                className="text-gray-400 hover:text-gray-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs bg-orange-50 p-3 rounded-xl border border-orange-200 space-y-1">
+              <p><span className="font-semibold text-orange-900">Consumer:</span> {flaggingDoc.consumer_name}</p>
+              <p><span className="font-semibold text-orange-900">Document:</span> {DOC_TYPE_LABELS[flaggingDoc.doc_type] || flaggingDoc.doc_type} (v{flaggingDoc.version || 1})</p>
+            </div>
+
+            <form onSubmit={handleQuickFlagSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Action Type / Correction Category *</label>
+                <select
+                  value={flagActionType}
+                  onChange={(e) => setFlagActionType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-800"
+                >
+                  <option value="electric_bill_name_correction">Electric Bill Name Correction</option>
+                  <option value="bank_passbook_name_correction">Bank Passbook Name Correction</option>
+                  <option value="bank_passbook_update">Bank Passbook Update</option>
+                  <option value="ownership_transfer">Ownership Transfer (Land RoR)</option>
+                  <option value="commercial_to_domestic">Commercial to Domestic Conversion</option>
+                  <option value="other">Other Issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Flag Details / Reason *</label>
+                <textarea
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  required
+                  rows={3}
+                  placeholder="Specify correction needed (e.g. name discrepancy, update passbook)..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-800 focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setFlaggingDoc(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-orange-600 text-white text-xs font-semibold rounded-xl hover:bg-orange-700 disabled:opacity-50 transition shadow-sm"
+                >
+                  {actionLoading ? 'Flagging...' : 'Confirm Flag Document'}
                 </button>
               </div>
             </form>

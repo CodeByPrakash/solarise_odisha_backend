@@ -34,6 +34,16 @@ const PORT = process.env.PORT || 'your_port';
 app.use(cors());
 app.use(express.json());
 
+// ⚡ Performance & Response Time Logger Middleware
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+        const duration = Date.now() - start;
+        console.log(`⚡ [API Speed] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    });
+    next();
+});
+
 
 
 app.get("/", (req, res) => {

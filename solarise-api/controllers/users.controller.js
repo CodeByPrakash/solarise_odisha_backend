@@ -81,8 +81,14 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
+        const loggedInUserId = req.user?.userId || req.user?.id;
         const creatorRole = req.user?.role;
         const { first_name, last_name, email, phone, role, is_active } = req.body;
+
+        // Prevent logged-in user from deactivating their own account
+        if (String(id) === String(loggedInUserId) && is_active === false) {
+            return res.status(400).json({ error: "You cannot deactivate your own logged-in account." });
+        }
 
         if (role && role === 'admin' && creatorRole !== 'admin') {
             return res.status(403).json({ error: "Only an authorized Admin can assign the Admin role." });
@@ -106,6 +112,13 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
+        const loggedInUserId = req.user?.userId || req.user?.id;
+
+        // Prevent logged-in user from deleting their own account
+        if (String(id) === String(loggedInUserId)) {
+            return res.status(400).json({ error: "You cannot delete your own logged-in account." });
+        }
+
         const result = await pool.query(
             "DELETE FROM users WHERE id = $1 RETURNING id, first_name, last_name",
             [id]
