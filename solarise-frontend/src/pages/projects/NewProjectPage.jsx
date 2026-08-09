@@ -23,9 +23,9 @@ const NewProjectPage = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [consRes, userRes] = await Promise.allSettled([
+      const [consRes, smRes] = await Promise.allSettled([
         consumerService.getAll(),
-        userService.getAll(),
+        userService.getByRole('site_manager'),
       ]);
 
       if (consRes.status === 'fulfilled') {
@@ -36,9 +36,16 @@ const NewProjectPage = () => {
         }
       }
 
-      if (userRes.status === 'fulfilled') {
-        const uList = userRes.value.data?.data || userRes.value.data || [];
-        setSiteManagers(uList);
+      if (smRes.status === 'fulfilled') {
+        const smList = smRes.value.data?.data || smRes.value.data || [];
+        if (Array.isArray(smList) && smList.length > 0) {
+          setSiteManagers(smList);
+        } else {
+          // Fallback: fetch all and filter for site_manager
+          const allRes = await userService.getAll();
+          const allList = allRes.data?.data || allRes.data || [];
+          setSiteManagers(allList.filter((u) => u.role === 'site_manager'));
+        }
       }
     } catch (err) {
       console.warn('Initial data load error:', err);
@@ -158,7 +165,7 @@ const NewProjectPage = () => {
               <option value="">-- Select Site Manager --</option>
               {siteManagers.map((sm) => (
                 <option key={sm.id} value={sm.id}>
-                  {sm.full_name} ({sm.role})
+                  Site Manager: {sm.full_name} ({sm.email || sm.phone || `ID: ${sm.id}`})
                 </option>
               ))}
             </select>

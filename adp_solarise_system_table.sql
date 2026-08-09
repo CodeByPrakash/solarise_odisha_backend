@@ -98,8 +98,7 @@ CREATE TABLE IF NOT EXISTS area_blocks (
 
 CREATE TABLE IF NOT EXISTS consumers (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
     address TEXT NOT NULL,
     area_block_id BIGINT NOT NULL REFERENCES area_blocks(id),
     email CITEXT,
@@ -123,6 +122,7 @@ CREATE TABLE IF NOT EXISTS consumers (
     land_owned_by_consumer BOOLEAN NOT NULL DEFAULT TRUE,
     occupation occupation_type,
     created_by BIGINT NOT NULL REFERENCES users(id),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS ownership_transfers (
 
 CREATE TABLE IF NOT EXISTS material_deliveries (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    project_id BIGINT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     delivered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     dcr_number TEXT,
     recorded_by BIGINT NOT NULL REFERENCES users(id)
@@ -254,3 +254,19 @@ CREATE INDEX IF NOT EXISTS idx_history_project ON status_history(project_id, cha
 CREATE INDEX IF NOT EXISTS idx_action_open ON action_required(project_id) WHERE status <> 'resolved';
 CREATE INDEX IF NOT EXISTS idx_payments_project ON payments(project_id);
 CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(user_id) WHERE NOT is_read;
+CREATE INDEX IF NOT EXISTS idx_material_deliveries_project ON material_deliveries(project_id);
+
+-- ============================================================
+-- 4. SCHEMA MIGRATIONS & SEQUENCE SYNCHRONIZATION
+-- ============================================================
+
+-- Ensure material_deliveries allows multiple delivery batches per project
+ALTER TABLE material_deliveries DROP CONSTRAINT IF EXISTS material_deliveries_project_id_key;
+DROP INDEX IF EXISTS material_deliveries_project_id_key;
+
+-- Synchronize material_deliveries primary key sequence with existing rows
+SELECT setval(
+    pg_get_serial_sequence('material_deliveries', 'id'),
+    COALESCE((SELECT MAX(id) FROM material_deliveries), 1),
+    true
+);

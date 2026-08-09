@@ -40,6 +40,7 @@ export const authService = {
 export const userService = {
   getAll: () => api.get('/users'),
   getById: (id) => api.get(`/users/${id}`),
+  getByRole: (role) => api.get(`/users/role/${role}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
 };
@@ -56,7 +57,10 @@ export const consumerService = {
   getById: (id) => api.get(`/consumers/${id}`),
   create: (data) => api.post('/consumers', data),
   update: (id, data) => api.put(`/consumers/${id}`, data),
+  deactivate: (id) => api.patch(`/consumers/${id}/deactivate`),
+  activate: (id) => api.patch(`/consumers/${id}/activate`),
   delete: (id) => api.delete(`/consumers/${id}`),
+  restore: (id) => api.patch(`/consumers/${id}/restore`),
 };
 
 // Projects Service
@@ -90,7 +94,8 @@ export const bankLoanService = {
 export const actionService = {
   getAll: () => api.get('/actions'),
   create: (data) => api.post('/actions', data),
-  resolve: (id, data) => api.put(`/actions/${id}/resolve`, data),
+  updateStatus: (id, data) => api.patch(`/actions/${id}/status`, data),
+  resolve: (id, data) => api.patch(`/actions/${id}/status`, { status: 'resolved', ...data }),
 };
 
 // Installation Progress Service

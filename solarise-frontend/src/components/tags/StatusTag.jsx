@@ -16,7 +16,6 @@ const COLOR_MAP = {
   subsidy_disbursed_cfa: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   subsidy_disbursed_sfa: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   project_handed_over: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-  resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   paid: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   verified: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
 
@@ -75,8 +74,8 @@ export const StatusTag = ({ status, onClick, showHashtag = true, size = 'md' }) 
   const sizeClasses = size === 'sm'
     ? 'px-2 py-0.5 text-[10px]'
     : size === 'lg'
-    ? 'px-3 py-1.5 text-xs'
-    : 'px-2.5 py-1 text-[11px]';
+      ? 'px-3 py-1.5 text-xs'
+      : 'px-2.5 py-1 text-[11px]';
 
   return (
     <span

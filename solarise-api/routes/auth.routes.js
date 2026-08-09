@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { login, register, getProfile } from "../controllers/auth.controller.js";
-import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
+import { authenticateToken, optionalAuthenticateToken } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -38,26 +38,30 @@ const router = Router();
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", login);          // POST /api/auth/login
+router.post("/login", login);
 
 /**
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Register a new user
+ *     summary: Register a new user (Authenticated & Role Restricted)
  *     tags: [Auth]
- *     security: []
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [full_name, email, phone, password]
+ *             required: [first_name, last_name, email, phone, password]
  *             properties:
- *               full_name:
+ *               first_name:
  *                 type: string
- *                 example: "Prakash Kumar"
+ *                 example: "Prakash"
+ *               last_name:
+ *                 type: string
+ *                 example: "Kumar"
  *               email:
  *                 type: string
  *                 example: "prakash@example.com"
@@ -74,10 +78,14 @@ router.post("/login", login);          // POST /api/auth/login
  *     responses:
  *       201:
  *         description: User registered successfully
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Role creation not authorized
  *       409:
  *         description: Email or phone already exists
  */
-router.post("/register", register);    // POST /api/auth/register
+router.post("/register", optionalAuthenticateToken, register);
 
 /**
  * @swagger
@@ -91,6 +99,6 @@ router.post("/register", register);    // POST /api/auth/register
  *       401:
  *         description: Token missing or invalid
  */
-router.get("/me", authenticateToken, getProfile); // GET /api/auth/me
+router.get("/me", authenticateToken, getProfile);
 
 export default router;

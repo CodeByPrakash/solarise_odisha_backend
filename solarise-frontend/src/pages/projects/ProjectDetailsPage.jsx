@@ -50,10 +50,10 @@ const ALL_PROJECT_STATUSES = [
   'security_deposit_paid',
   'psa_agreement_done',
   'pmsgy_done',
+  'line_up_given',
   'loan_applied',
   'loan_approved',
   'loan_rejected',
-  'line_up_given',
   'materials_delivered',
   'installation_in_progress',
   'installation_done',
@@ -99,16 +99,50 @@ const ProjectDetailsPage = () => {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Status transition state
   const [selectedStatus, setSelectedStatus] = useState('');
   const [statusRemarks, setStatusRemarks] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Material Delivery state
-  const [materialDelivery, setMaterialDelivery] = useState(null);
-  const [dcrNumber, setDcrNumber] = useState('');
+  const [materialDeliveries, setMaterialDeliveries] = useState([]);
+  const [dcrList, setDcrList] = useState(['']);
   const [recordingDelivery, setRecordingDelivery] = useState(false);
+  const [showDeliveryForm, setShowDeliveryForm] = useState(false);
+  const [editingDeliveryId, setEditingDeliveryId] = useState(null);
+
+  const handleAddDcrField = () => {
+    setDcrList((prev) => [...prev, '']);
+  };
+
+  const handleRemoveDcrField = (index) => {
+    setDcrList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDcrChange = (index, value) => {
+    setDcrList((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const handleStartEditDelivery = (delivery) => {
+    setEditingDeliveryId(delivery.id);
+    const existing = (delivery.dcr_number || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setDcrList(existing.length > 0 ? existing : ['']);
+    setShowDeliveryForm(true);
+  };
+
+  const handleStartNewDeliveryBatch = () => {
+    setEditingDeliveryId(null);
+    setDcrList(['']);
+    setShowDeliveryForm((prev) => !prev);
+  };
 
   // Installation Progress state
   const [installationItems, setInstallationItems] = useState([]);
@@ -138,12 +172,17 @@ const ProjectDetailsPage = () => {
       setProject(projData);
       setSelectedStatus(projData.current_status || 'new_registration');
 
-      // Fetch material delivery
+      // Fetch material deliveries
       try {
         const matRes = await api.get(`/material-deliveries/project/${id}`);
-        setMaterialDelivery(matRes.data?.data || matRes.data);
+        const list = Array.isArray(matRes.data?.data)
+          ? matRes.data.data
+          : matRes.data?.data
+          ? [matRes.data.data]
+          : [];
+        setMaterialDeliveries(list);
       } catch (e) {
-        setMaterialDelivery(null);
+        setMaterialDeliveries([]);
       }
 
       // Fetch installation progress
@@ -208,6 +247,7 @@ const ProjectDetailsPage = () => {
       await projectService.updateStatus(id, {
         to_status: selectedStatus,
         remarks: statusRemarks,
+        changed_by: user?.id || user?.userId || 1,
       });
       setStatusRemarks('');
       await fetchProjectDetails();
@@ -218,19 +258,38 @@ const ProjectDetailsPage = () => {
     }
   };
 
-  // Site Manager: Record Material Delivery
+  // Site Manager: Record or Update Material Delivery
   const handleRecordMaterialDelivery = async (e) => {
     e.preventDefault();
+    const validDcrs = dcrList.map((s) => s.trim()).filter(Boolean);
+    if (validDcrs.length === 0) {
+      alert('Please enter at least one DCR serial number.');
+      return;
+    }
+    const combinedDcrString = validDcrs.join(', ');
     try {
       setRecordingDelivery(true);
-      await api.post('/material-deliveries', {
-        project_id: id,
-        dcr_number: dcrNumber,
-      });
-      setDcrNumber('');
+      if (editingDeliveryId) {
+        // Edit existing delivery record (preserves existing delivery ID)
+        await api.put(`/material-deliveries/${editingDeliveryId}`, {
+          dcr_number: combinedDcrString,
+        });
+        alert('✓ Material Delivery record updated successfully!');
+      } else {
+        // Record brand new delivery batch
+        await api.post('/material-deliveries', {
+          project_id: id,
+          dcr_number: combinedDcrString,
+          recorded_by: user?.id || user?.userId || 1,
+        });
+        alert('✓ New Material Delivery batch recorded successfully!');
+      }
+      setDcrList(['']);
+      setEditingDeliveryId(null);
+      setShowDeliveryForm(false);
       await fetchProjectDetails();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to record material delivery');
+      alert(err.response?.data?.error || 'Failed to process material delivery request');
     } finally {
       setRecordingDelivery(false);
     }
@@ -250,7 +309,7 @@ const ProjectDetailsPage = () => {
       setSavingChecklist(true);
       await installationService.saveBatch(id, {
         items: installationItems,
-        done_by: user?.id || 1,
+        done_by: user?.id || user?.userId || 1,
       });
       await fetchProjectDetails();
       alert('✓ Installation progress saved successfully!');
@@ -269,6 +328,7 @@ const ProjectDetailsPage = () => {
         project_id: id,
         action_type: actionType,
         detail: actionDetail,
+        raised_by: user?.id || user?.userId || 1,
       });
 
       const actionId = actRes.data?.data?.id || actRes.data?.id;
@@ -286,8 +346,32 @@ const ProjectDetailsPage = () => {
       setActionDetail('');
       setBeneficiaryName('');
       await fetchProjectDetails();
+
+      setTimeout(() => {
+        const el = document.getElementById('actions-required-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to raise action');
+    }
+  };
+
+  // Resolve Action Required
+  const [resolvingActionId, setResolvingActionId] = useState(null);
+  const handleResolveAction = async (actionId) => {
+    try {
+      setResolvingActionId(actionId);
+      await actionService.resolve(actionId, {
+        resolved_by: user?.id || user?.userId || 1,
+      });
+      await fetchProjectDetails();
+      alert('✓ Action marked as resolved! Project status updated.');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to resolve action');
+    } finally {
+      setResolvingActionId(null);
     }
   };
 
@@ -403,49 +487,152 @@ const ProjectDetailsPage = () => {
           </form>
         </div>
 
-        {/* Site Manager: Material Delivery Card */}
+        {/* Site Manager: Material Delivery Logs & Multi-Batch Tracking */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
-            <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            <span>Material Delivery (Site Manager)</span>
-          </h2>
+          <div className="flex justify-between items-center border-b pb-3">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
+              <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <span>Material Delivery Logs ({materialDeliveries.length})</span>
+            </h2>
+            <button
+              type="button"
+              onClick={handleStartNewDeliveryBatch}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-300 transition flex items-center space-x-1"
+            >
+              <span>{showDeliveryForm && !editingDeliveryId ? '✕ Close Form' : '+ Record New Delivery Batch'}</span>
+            </button>
+          </div>
 
-          {materialDelivery ? (
-            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="font-semibold text-emerald-800">DCR Number:</span>
-                <span className="font-mono text-emerald-900">{materialDelivery.dcr_number || 'N/A'}</span>
+          {/* Form for adding new batch or editing existing delivery record */}
+          {(showDeliveryForm || materialDeliveries.length === 0) && (
+            <form onSubmit={handleRecordMaterialDelivery} className="p-4 bg-blue-50/50 rounded-xl border border-blue-200 space-y-3">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-blue-900">
+                    {editingDeliveryId
+                      ? '✏️ Edit Delivery Record (Add/Update DCR Serial Numbers)'
+                      : 'Record Delivered Material DCR Numbers'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddDcrField}
+                    className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg border border-emerald-300 transition flex items-center space-x-1 shadow-2xs"
+                  >
+                    <span>+ Add DCR Number</span>
+                  </button>
+                </div>
+
+                {dcrList.map((dcrVal, idx) => (
+                  <div key={idx} className="flex items-center space-x-2">
+                    <span className="text-[11px] font-mono font-bold text-gray-400 w-5 text-right">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={dcrVal}
+                      onChange={(e) => handleDcrChange(idx, e.target.value)}
+                      placeholder={`e.g. DCR-PANEL-2026-${1000 + idx}`}
+                      required={idx === 0}
+                      className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-blue-500 font-mono bg-white"
+                    />
+                    {dcrList.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDcrField(idx)}
+                        className="px-2 py-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition text-xs font-bold"
+                        title="Remove field"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between">
-                <span className="font-semibold text-emerald-800">Delivered At:</span>
-                <span>{new Date(materialDelivery.delivered_at).toLocaleDateString()}</span>
+
+              <div className="flex items-center space-x-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={recordingDelivery}
+                  className="flex-1 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition disabled:opacity-50 shadow-sm"
+                >
+                  {recordingDelivery
+                    ? 'Saving...'
+                    : editingDeliveryId
+                    ? 'Save & Update Delivery Record'
+                    : 'Save Material Delivery Batch'}
+                </button>
+                {(materialDeliveries.length > 0 || editingDeliveryId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeliveryForm(false);
+                      setEditingDeliveryId(null);
+                      setDcrList(['']);
+                    }}
+                    className="px-3 py-2 bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-300 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
-            </div>
-          ) : (
-            <form onSubmit={handleRecordMaterialDelivery} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  DCR Serial Number
-                </label>
-                <input
-                  type="text"
-                  value={dcrNumber}
-                  onChange={(e) => setDcrNumber(e.target.value)}
-                  placeholder="e.g. DCR-2026-88910"
-                  required
-                  className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={recordingDelivery}
-                className="w-full py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-              >
-                {recordingDelivery ? 'Recording...' : 'Record Material Delivery'}
-              </button>
             </form>
+          )}
+
+          {/* List of recorded material delivery batches */}
+          {materialDeliveries.length === 0 ? (
+            <p className="text-xs text-gray-400 italic py-2">No material delivery recorded for this project yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {materialDeliveries.map((delivery, batchIdx) => (
+                <div key={delivery.id || batchIdx} className="bg-emerald-50/70 p-4 rounded-xl border border-emerald-200 text-xs space-y-2.5">
+                  <div className="flex justify-between items-center border-b border-emerald-200/80 pb-2">
+                    <span className="font-bold text-emerald-950 uppercase tracking-wide text-[11px]">
+                      Delivery Batch #{materialDeliveries.length - batchIdx}
+                    </span>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-[11px] text-emerald-800 font-semibold">
+                        📅 {new Date(delivery.delivered_at).toLocaleDateString()} {new Date(delivery.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditDelivery(delivery)}
+                        className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-300 transition flex items-center space-x-1 shadow-2xs"
+                      >
+                        <span>✏️ Edit</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-emerald-900 block mb-1">
+                      Delivered DCR Numbers:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {delivery.dcr_number ? (
+                        delivery.dcr_number.split(',').map((dcr, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-1 bg-white text-emerald-950 font-mono font-bold text-[11px] rounded-lg border border-emerald-300 shadow-2xs"
+                          >
+                            📄 {dcr.trim()}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic">None specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {delivery.recorded_by_name && (
+                    <div className="text-[10px] text-emerald-700 font-medium pt-1">
+                      Recorded By: {delivery.recorded_by_name}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -492,9 +679,8 @@ const ProjectDetailsPage = () => {
           {installationItems.map((item) => (
             <div
               key={item.item}
-              className={`flex items-center justify-between p-3.5 rounded-xl border transition ${
-                item.is_done ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
-              }`}
+              className={`flex items-center justify-between p-3.5 rounded-xl border transition ${item.is_done ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <input
@@ -510,9 +696,8 @@ const ProjectDetailsPage = () => {
                   <p className="text-[10px] text-gray-500 font-mono">Weight: {item.weight_pct}%</p>
                 </div>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                item.is_done ? 'bg-emerald-200 text-emerald-800' : 'bg-gray-200 text-gray-600'
-              }`}>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.is_done ? 'bg-emerald-200 text-emerald-800' : 'bg-gray-200 text-gray-600'
+                }`}>
                 {item.is_done ? 'DONE' : 'PENDING'}
               </span>
             </div>
@@ -532,7 +717,7 @@ const ProjectDetailsPage = () => {
       </div>
 
       {/* Actions Required & Ownership Transfers */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+      <div id="actions-required-section" className="bg-white p-6 rounded-2xl shadow-sm border border-amber-200 bg-gradient-to-br from-amber-50/20 to-white space-y-4">
         <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
           <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.78-1.34-.25-2.864 1.018-3.836 1.306-1.016 2.888-.918 4.071-.345" />
@@ -545,12 +730,28 @@ const ProjectDetailsPage = () => {
         ) : (
           <div className="space-y-3">
             {actions.map((act) => (
-              <div key={act.id} className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-xs space-y-1.5">
+              <div key={act.id} className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-xs space-y-2">
                 <div className="flex justify-between items-center font-semibold text-amber-900">
                   <span className="capitalize">{(act.action_type || '').replace(/_/g, ' ')}</span>
-                  <StatusTag status={act.status || 'open'} size="sm" />
+                  <div className="flex items-center space-x-2">
+                    <StatusTag status={act.status || 'open'} size="sm" />
+                    {act.status !== 'resolved' && (
+                      <button
+                        onClick={() => handleResolveAction(act.id)}
+                        disabled={resolvingActionId === act.id}
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition disabled:opacity-50 shadow-xs"
+                      >
+                        {resolvingActionId === act.id ? 'Resolving...' : '✓ Resolve Action'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-amber-800">{act.detail || 'No details specified'}</p>
+                {act.status === 'resolved' && (
+                  <div className="text-[10px] text-emerald-700 font-semibold flex items-center space-x-1 pt-1.5 border-t border-emerald-200/60">
+                    <span>✓ Resolved by user #{act.resolved_by || '1'}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

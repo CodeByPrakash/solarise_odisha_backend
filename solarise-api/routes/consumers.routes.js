@@ -1,5 +1,14 @@
 import { Router } from "express";
-import { getAllConsumers, getConsumerById, createConsumer, updateConsumer, deleteConsumer } from "../controllers/consumers.controller.js";
+import {
+  getAllConsumers,
+  getConsumerById,
+  createConsumer,
+  updateConsumer,
+  deleteConsumer,
+  restoreConsumer,
+  deactivateConsumer,
+  activateConsumer
+} from "../controllers/consumers.controller.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
 const router = Router();
 
@@ -14,7 +23,7 @@ const router = Router();
  * @swagger
  * /api/consumers:
  *   get:
- *     summary: Get all consumers
+ *     summary: Get all consumers (regular roles receive active only, admins receive all)
  *     tags: [Consumers]
  *     responses:
  *       200:
@@ -105,9 +114,9 @@ router.put("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'doc_team
 
 /**
  * @swagger
- * /api/consumers/{id}:
- *   delete:
- *     summary: Delete a consumer
+ * /api/consumers/{id}/deactivate:
+ *   patch:
+ *     summary: Deactivate a consumer profile (sets is_active = FALSE)
  *     tags: [Consumers]
  *     parameters:
  *       - in: path
@@ -117,8 +126,30 @@ router.put("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'doc_team
  *           type: integer
  *     responses:
  *       200:
- *         description: Deleted
+ *         description: Deactivated
  */
-router.delete("/:id", authenticateToken, authorizeRoles('admin'), deleteConsumer);
+router.patch("/:id/deactivate", authenticateToken, authorizeRoles('admin', 'doc_team'), deactivateConsumer);
+
+/**
+ * @swagger
+ * /api/consumers/{id}/activate:
+ *   patch:
+ *     summary: Activate a deactivated consumer profile (sets is_active = TRUE)
+ *     tags: [Consumers]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Activated
+ */
+router.patch("/:id/activate", authenticateToken, authorizeRoles('admin', 'doc_team'), activateConsumer);
+
+// Backwards compatibility routes
+router.delete("/:id", authenticateToken, authorizeRoles('admin', 'doc_team'), deleteConsumer);
+router.patch("/:id/restore", authenticateToken, authorizeRoles('admin', 'doc_team'), restoreConsumer);
 
 export default router;

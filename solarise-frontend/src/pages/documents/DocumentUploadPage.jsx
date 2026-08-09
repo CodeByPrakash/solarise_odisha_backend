@@ -2,18 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentService, consumerService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-
-const DOC_TYPES = [
-  { value: 'aadhaar', label: 'Aadhaar Card' },
-  { value: 'pan', label: 'PAN Card' },
-  { value: 'ror', label: 'Land ROR (Patta)' },
-  { value: 'electricity_bill', label: 'DISCOM Electricity Bill' },
-  { value: 'geotag_photo', label: 'Geotagged Roof Site Photo' },
-  { value: 'discom_noc', label: 'DISCOM Feasibility NOC' },
-  { value: 'net_metering_agreement', label: 'Net Metering Agreement' },
-  { value: 'installation_photo', label: 'Installation Verification Photo' },
-  { value: 'bank_passbook', label: 'Bank Passbook / Cancelled Cheque' },
-];
+import { ALL_DOCUMENT_TYPES } from '../../constants/documentTypes';
 
 const DocumentUploadPage = () => {
   const navigate = useNavigate();
@@ -25,7 +14,7 @@ const DocumentUploadPage = () => {
 
   const [form, setForm] = useState({
     consumer_id: '',
-    doc_type: 'geotag_photo',
+    doc_type: 'electric_bill',
     file_name: '',
     file_url: '',
     mime_type: 'image/jpeg',
@@ -151,11 +140,11 @@ const DocumentUploadPage = () => {
               value={form.doc_type}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2.5 rounded-xl border text-xs bg-white"
+              className="w-full px-3 py-2.5 rounded-xl border text-xs bg-white focus:ring-2 focus:ring-emerald-500"
             >
-              {DOC_TYPES.map((dt) => (
+              {ALL_DOCUMENT_TYPES.map((dt) => (
                 <option key={dt.value} value={dt.value}>
-                  {dt.label}
+                  {dt.label} ({dt.value})
                 </option>
               ))}
             </select>

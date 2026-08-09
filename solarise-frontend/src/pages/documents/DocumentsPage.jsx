@@ -2,20 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
-import { documentService } from '../../services/api';
+import { documentService, actionService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-
-const DOC_TYPE_LABELS = {
-  aadhaar: 'Aadhaar Card',
-  pan: 'PAN Card',
-  ror: 'Land ROR (Patta)',
-  electricity_bill: 'DISCOM Electricity Bill',
-  geotag_photo: 'Geotagged Roof Site Photo',
-  discom_noc: 'DISCOM Feasibility NOC',
-  net_metering_agreement: 'Net Metering Agreement',
-  installation_photo: 'Installation Verification Photo',
-  bank_passbook: 'Bank Passbook / Cancelled Cheque',
-};
+import { ALL_DOCUMENT_TYPES, DOC_TYPE_LABELS } from '../../constants/documentTypes';
+import StatusTag from '../../components/tags/StatusTag';
 
 const DocumentsPage = () => {
   const navigate = useNavigate();
@@ -23,11 +13,13 @@ const DocumentsPage = () => {
 
   const [documents, setDocuments] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [openActions, setOpenActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Filters & Search
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedDocType, setSelectedDocType] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Quick Reject Modal
@@ -45,9 +37,10 @@ const DocumentsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const [listRes, summaryRes] = await Promise.allSettled([
+      const [listRes, summaryRes, actionsRes] = await Promise.allSettled([
         documentService.getAll(),
         documentService.getStatusSummary(),
+        actionService.getAll(),
       ]);
 
       if (listRes.status === 'fulfilled') {
@@ -57,6 +50,11 @@ const DocumentsPage = () => {
 
       if (summaryRes.status === 'fulfilled') {
         setSummary(summaryRes.value.data);
+      }
+
+      if (actionsRes.status === 'fulfilled') {
+        const actData = actionsRes.value.data?.data || actionsRes.value.data;
+        setOpenActions(Array.isArray(actData) ? actData : []);
       }
     } catch (err) {
       console.error('API error fetching documents:', err);
@@ -73,6 +71,18 @@ const DocumentsPage = () => {
       await fetchDocumentsData();
     } catch (err) {
       alert(err.response?.data?.error || 'Verification failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickResolveAction = async (actionId) => {
+    try {
+      setActionLoading(true);
+      await actionService.resolve(actionId, { resolved_by: user?.id || 1 });
+      await fetchDocumentsData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to resolve action');
     } finally {
       setActionLoading(false);
     }
@@ -98,17 +108,21 @@ const DocumentsPage = () => {
   };
 
   const filteredDocs = documents.filter((doc) => {
+    const matchesDocType = selectedDocType === 'all' || doc.doc_type === selectedDocType;
+    const docLabel = DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type || '';
     const matchesSearch =
       (doc.consumer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.doc_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      docLabel.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.file_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (doc.status || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    if (!matchesSearch) return false;
+    if (!matchesDocType || !matchesSearch) return false;
 
     if (activeTab === 'uploaded') return doc.status === 'uploaded';
     if (activeTab === 'verified') return doc.status === 'verified';
     if (activeTab === 'rejected') return doc.status === 'rejected';
+    if (activeTab === 'action_required') return doc.status === 'action_required';
     return true;
   });
 
@@ -116,6 +130,7 @@ const DocumentsPage = () => {
   const uploadedCount = documents.filter(d => d.status === 'uploaded').length;
   const verifiedCount = documents.filter(d => d.status === 'verified').length;
   const rejectedCount = documents.filter(d => d.status === 'rejected').length;
+  const actionRequiredCount = documents.filter(d => d.status === 'action_required').length + openActions.length;
 
   return (
     <div className="space-y-6 pb-12">
@@ -137,29 +152,35 @@ const DocumentsPage = () => {
       </div>
 
       {/* Status KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Total Uploads</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Total Uploads</span>
           <p className="text-2xl font-extrabold text-gray-900 mt-1">{totalCount}</p>
-          <span className="text-xs text-gray-400 mt-1 block">Indexed consumer documents</span>
+          <span className="text-[10px] text-gray-400 mt-1 block">Indexed documents</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50/30 to-white shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">Pending Review</span>
+        <div className="bg-white p-4 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50/30 to-white shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600">Pending Review</span>
           <p className="text-2xl font-extrabold text-amber-700 mt-1">{uploadedCount}</p>
-          <span className="text-xs text-amber-600 mt-1 block">Awaiting doc team approval</span>
+          <span className="text-[10px] text-amber-600 mt-1 block">Awaiting approval</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/30 to-white shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Verified Docs</span>
+        <div className="bg-white p-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/30 to-white shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">Verified Docs</span>
           <p className="text-2xl font-extrabold text-emerald-700 mt-1">{verifiedCount}</p>
-          <span className="text-xs text-emerald-600 mt-1 block">Passed compliance check</span>
+          <span className="text-[10px] text-emerald-600 mt-1 block">Passed compliance</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/30 to-white shadow-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-rose-600">Rejected / Resubmit</span>
+        <div className="bg-white p-4 rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/30 to-white shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-600">Rejected</span>
           <p className="text-2xl font-extrabold text-rose-700 mt-1">{rejectedCount}</p>
-          <span className="text-xs text-rose-600 mt-1 block">Requires new upload version</span>
+          <span className="text-[10px] text-rose-600 mt-1 block">Requires re-upload</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/50 to-white shadow-sm">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-orange-600">Action Required</span>
+          <p className="text-2xl font-extrabold text-orange-700 mt-1">{actionRequiredCount}</p>
+          <span className="text-[10px] text-orange-600 mt-1 block">Corrections requested</span>
         </div>
       </div>
 
@@ -169,31 +190,97 @@ const DocumentsPage = () => {
           {[
             { key: 'all', label: 'All Documents' },
             { key: 'uploaded', label: `Pending Review (${uploadedCount})` },
+            { key: 'action_required', label: `Action Required (${actionRequiredCount})` },
             { key: 'verified', label: `Verified (${verifiedCount})` },
             { key: 'rejected', label: `Rejected (${rejectedCount})` },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 ${
-                activeTab === tab.key
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 ${activeTab === tab.key
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
 
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by consumer, doc type, or filename..."
-          className="w-full sm:w-64 px-3.5 py-1.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-emerald-500"
-        />
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <select
+            value={selectedDocType}
+            onChange={(e) => setSelectedDocType(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-emerald-500 font-medium"
+          >
+            <option value="all">All Document Types (28 Categories)</option>
+            {ALL_DOCUMENT_TYPES.map((dt) => (
+              <option key={dt.value} value={dt.value}>
+                {dt.label} ({dt.value})
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search documents..."
+            className="w-full sm:w-52 px-3.5 py-1.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
       </div>
+
+      {/* Pending Correction Actions Desk Banner */}
+      {openActions.length > 0 && (
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-5 rounded-2xl border border-amber-200 shadow-sm space-y-3">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <h3 className="text-xs font-extrabold text-amber-900 uppercase tracking-wide">
+                Pending Correction Actions ({openActions.length})
+              </h3>
+            </div>
+            <span className="text-[11px] text-amber-700 font-semibold">Raised from Projects Desk</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {openActions.map((act) => (
+              <div key={act.id} className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-xs space-y-2 text-xs">
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-gray-900">{act.consumer_name || `Project #${act.project_id}`}</span>
+                  <StatusTag status={act.status || 'open'} size="sm" />
+                </div>
+                <div className="inline-block px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-bold text-[11px]">
+                  {(act.action_type || '').replace(/_/g, ' ')}
+                </div>
+                <p className="text-gray-600 text-[11px] line-clamp-2">{act.detail || 'Correction detail requested'}</p>
+                <div className="pt-2 border-t flex justify-between items-center text-[11px]">
+                  <span className="text-gray-400">Raised: {act.raised_by_name || 'Doc Team'}</span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleQuickResolveAction(act.id)}
+                      disabled={actionLoading}
+                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition disabled:opacity-50"
+                    >
+                      ✓ Resolve
+                    </button>
+                    <button
+                      onClick={() => navigate(`/projects/${act.project_id}`)}
+                      className="text-amber-700 font-bold hover:underline text-[10px]"
+                    >
+                      View →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-xl border border-amber-200 flex items-center justify-between">
@@ -257,11 +344,10 @@ const DocumentsPage = () => {
                     )}
                   </Table.Cell>
                   <Table.Cell>
-                    <span className={`px-2.5 py-1 text-[11px] rounded-full font-bold capitalize ${
-                      doc.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                    <span className={`px-2.5 py-1 text-[11px] rounded-full font-bold capitalize ${doc.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                       doc.status === 'rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                      'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}>
+                        'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}>
                       {doc.status}
                     </span>
                   </Table.Cell>
