@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS consumers (
     land_owned_by_consumer BOOLEAN NOT NULL DEFAULT TRUE,
     occupation occupation_type,
     created_by BIGINT NOT NULL REFERENCES users(id),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
