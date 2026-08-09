@@ -1,20 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { consumerService, bankLoanService, documentService } from '../../services/api';
-import api from '../../services/api';
+import { consumerService, bankLoanService, documentService, projectService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const ConsumerDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [consumer, setConsumer] = useState(null);
   const [bankLoan, setBankLoan] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [linkedProject, setLinkedProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Bank Loan form modal state
+  // Modals state
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+
+  // Edit Consumer form state
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    address: '',
+    area_block_id: '',
+    email: '',
+    phone_primary: '',
+    phone_secondary: '',
+    contact_person_name: '',
+    contact_person_phone: '',
+    contact_person_relation: '',
+    same_as_contact_person: false,
+    electric_consumer_no: '',
+    name_on_electric_bill: '',
+    phone_on_electric_bill: '',
+    geo_lat: '',
+    geo_lng: '',
+    age: '',
+    aadhaar_no: '',
+    pan_no: '',
+    bank_account_no: '',
+    payment_mode: 'cash',
+    land_owned_by_consumer: true,
+    occupation: 'self_employed',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Bank Loan form state
   const [loanForm, setLoanForm] = useState({
     bank_name: '',
     loan_amount: '',
@@ -22,6 +55,11 @@ const ConsumerDetailsPage = () => {
     remarks: '',
   });
   const [savingLoan, setSavingLoan] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  // Authorization check for consumer activation & deactivation
+  const canManageDeactivation = ['admin', 'doc_team'].includes(user?.role);
 
   useEffect(() => {
     fetchConsumerDetails();
@@ -35,6 +73,43 @@ const ConsumerDetailsPage = () => {
       const consRes = await consumerService.getById(id);
       const consData = consRes.data?.data || consRes.data;
       setConsumer(consData);
+
+      if (consData) {
+        setEditForm({
+          full_name: consData.full_name || '',
+          address: consData.address || '',
+          area_block_id: consData.area_block_id || 1,
+          email: consData.email || '',
+          phone_primary: consData.phone_primary || '',
+          phone_secondary: consData.phone_secondary || '',
+          contact_person_name: consData.contact_person_name || '',
+          contact_person_phone: consData.contact_person_phone || '',
+          contact_person_relation: consData.contact_person_relation || '',
+          same_as_contact_person: consData.same_as_contact_person || false,
+          electric_consumer_no: consData.electric_consumer_no || '',
+          name_on_electric_bill: consData.name_on_electric_bill || '',
+          phone_on_electric_bill: consData.phone_on_electric_bill || '',
+          geo_lat: consData.geo_lat || '',
+          geo_lng: consData.geo_lng || '',
+          age: consData.age || 35,
+          aadhaar_no: consData.aadhaar_no || '',
+          pan_no: consData.pan_no || '',
+          bank_account_no: consData.bank_account_no || '',
+          payment_mode: consData.payment_mode || 'cash',
+          land_owned_by_consumer: consData.land_owned_by_consumer ?? true,
+          occupation: consData.occupation || 'self_employed',
+        });
+      }
+
+      // Fetch Linked Project
+      try {
+        const projRes = await projectService.getAll();
+        const projList = Array.isArray(projRes.data?.data) ? projRes.data.data : (Array.isArray(projRes.data) ? projRes.data : []);
+        const found = projList.find((p) => String(p.consumer_id) === String(id));
+        setLinkedProject(found || null);
+      } catch (e) {
+        setLinkedProject(null);
+      }
 
       // Fetch Bank Loan
       try {
@@ -68,6 +143,26 @@ const ConsumerDetailsPage = () => {
     }
   };
 
+  const handleSaveEditConsumer = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingEdit(true);
+      const payload = {
+        ...editForm,
+        age: parseInt(editForm.age, 10),
+        geo_lat: editForm.geo_lat ? parseFloat(editForm.geo_lat) : null,
+        geo_lng: editForm.geo_lng ? parseFloat(editForm.geo_lng) : null,
+      };
+      await consumerService.update(id, payload);
+      setShowEditModal(false);
+      await fetchConsumerDetails();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update consumer details');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleSaveBankLoan = async (e) => {
     e.preventDefault();
     try {
@@ -85,6 +180,39 @@ const ConsumerDetailsPage = () => {
     }
   };
 
+  const handleDeactivateConsumer = async () => {
+    if (!canManageDeactivation) {
+      alert('Unauthorized: Only Admin and Document Team roles can deactivate consumer profiles.');
+      return;
+    }
+    try {
+      setDeactivating(true);
+      await consumerService.deactivate(id);
+      setShowDeactivateModal(false);
+      await fetchConsumerDetails();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to deactivate consumer');
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const handleActivateConsumer = async () => {
+    if (!canManageDeactivation) {
+      alert('Unauthorized: Only Admin and Document Team roles can activate consumer profiles.');
+      return;
+    }
+    try {
+      setActivating(true);
+      await consumerService.activate(id);
+      await fetchConsumerDetails();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to activate consumer profile');
+    } finally {
+      setActivating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -97,222 +225,429 @@ const ConsumerDetailsPage = () => {
     return (
       <div className="bg-rose-50 text-rose-800 p-6 rounded-2xl border border-rose-200 text-center space-y-4">
         <p className="font-semibold">{error || 'Consumer not found'}</p>
-        <button onClick={() => navigate('/consumers')} className="px-4 py-2 bg-rose-600 text-white text-sm rounded-lg">
+        <button onClick={() => navigate('/consumers')} className="px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-full">
           ← Back to Consumers
         </button>
       </div>
     );
   }
 
-  // Check age for MAC eligibility
   const age = consumer.age || 0;
   const isSurpassedMAC = age > 64;
+  const isDeactivated = consumer.is_active === false;
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Consumer Profile Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+      {/* Deactivated Consumer Status Alert Banner */}
+      {isDeactivated && (
+        <div className="p-6 bg-amber-50 rounded-[28px] border border-amber-200 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-[14px] bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xl shrink-0">
+              🔒
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-amber-950">Consumer Profile is Currently Deactivated</h3>
+              <p className="text-xs text-amber-900 mt-0.5">
+                This consumer account is deactivated and hidden from regular views. All linked solar projects, DISCOM meter data, and bank loans remain 100% saved in the database.
+              </p>
+            </div>
+          </div>
+
+          {canManageDeactivation && (
+            <button
+              onClick={handleActivateConsumer}
+              disabled={activating}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-2xs transition shrink-0 flex items-center space-x-1"
+            >
+              <span>{activating ? 'Activating...' : '⚡ Activate Consumer Profile'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Profile Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80">
         <div>
           <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold text-gray-900">{consumer.full_name}</h1>
-            <span className={`px-3 py-0.5 text-xs font-semibold rounded-full capitalize ${
-              consumer.payment_mode === 'cash' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-            }`}>
-              Payment Mode: {consumer.payment_mode || 'Cash'}
+            <h1 className="text-2xl font-extrabold text-slate-900">{consumer.full_name}</h1>
+            <span className={`px-3 py-1 text-xs font-bold rounded-full capitalize ${consumer.payment_mode === 'cash' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}>
+              Payment: {consumer.payment_mode || 'Cash'}
             </span>
+            {isDeactivated && (
+              <span className="px-3 py-1 text-xs font-extrabold rounded-full bg-amber-100 text-amber-950 border border-amber-300">
+                Deactivated
+              </span>
+            )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Electric Consumer No: <span className="font-mono font-semibold text-gray-900">{consumer.electric_consumer_no}</span> | Phone: <span className="font-semibold text-gray-900">{consumer.phone_primary}</span>
+          <p className="text-xs text-slate-500 mt-1">
+            Electric Consumer No: <span className="font-mono font-bold text-slate-900">{consumer.electric_consumer_no}</span> | Primary Phone: <span className="font-bold text-slate-900">{consumer.phone_primary}</span>
           </p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center space-x-3">
+
+        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowEditModal(true)}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition border border-slate-200"
+          >
+            ✏️ Edit Profile
+          </button>
+
+          {/* Deactivate / Activate Actions restricted to admin & doc_team */}
+          {canManageDeactivation && (
+            isDeactivated ? (
+              <button
+                onClick={handleActivateConsumer}
+                disabled={activating}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full transition shadow-2xs"
+              >
+                {activating ? 'Activating...' : '⚡ Activate Consumer'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowDeactivateModal(true)}
+                className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-full transition border border-amber-300"
+              >
+                🚫 Deactivate
+              </button>
+            )
+          )}
+
           <button
             onClick={() => navigate('/consumers')}
-            className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-full transition"
           >
-            ← Back to List
+            ← Back to Directory
           </button>
         </div>
       </div>
 
-      {/* MAC Eligibility & Profile Details Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Profile Details Card */}
-        <div className="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
-            <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span>Consumer Personal Details</span>
+      {/* Linked Solar Project Banner */}
+      <div className="bg-white p-6 rounded-[28px] shadow-sm border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="h-10 w-10 rounded-[14px] bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-bold text-lg shadow-2xs">
+            ☀️
+          </div>
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Linked Solar Installation Project</h3>
+            {linkedProject ? (
+              <p className="text-xs text-slate-500 mt-0.5">
+                Registration No: <span className="font-mono font-bold text-slate-800">{linkedProject.registration_no || `PROJ-${linkedProject.id}`}</span> | Capacity: <span className="font-bold text-emerald-600">{linkedProject.capacity_kw} kW</span> | Status: <span className="font-bold text-indigo-600 capitalize">{(linkedProject.current_status || '').replace(/_/g, ' ')}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-0.5">No active solar project registered under this consumer yet.</p>
+            )}
+          </div>
+        </div>
+
+        {linkedProject ? (
+          <button
+            onClick={() => navigate(`/projects/${linkedProject.id}`)}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-2xs transition"
+          >
+            View Project Details →
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/projects/new')}
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-2xs transition"
+          >
+            + Register Solar Project
+          </button>
+        )}
+      </div>
+
+      {/* Details Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Personal & Contact Person Details Card */}
+        <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-6">
+          <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-3">
+            <span>👤 Consumer Personal & Contact Credentials</span>
           </h2>
 
-          <div className="grid grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <span className="text-gray-400 font-semibold block">Full Name</span>
-              <span className="text-gray-900 font-medium">{consumer.full_name}</span>
+              <span className="text-slate-400 font-bold block">Full Name</span>
+              <span className="text-slate-900 font-extrabold text-sm">{consumer.full_name}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">Primary Phone</span>
-              <span className="text-gray-900 font-medium">{consumer.phone_primary}</span>
+              <span className="text-slate-400 font-bold block">Primary Phone</span>
+              <span className="text-slate-900 font-semibold">{consumer.phone_primary}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">Secondary Phone</span>
-              <span className="text-gray-900 font-medium">{consumer.phone_secondary || '-'}</span>
+              <span className="text-slate-400 font-bold block">Secondary Phone</span>
+              <span className="text-slate-900 font-semibold">{consumer.phone_secondary || 'N/A'}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">Email Address</span>
-              <span className="text-gray-900 font-medium">{consumer.email || '-'}</span>
+              <span className="text-slate-400 font-bold block">Email Address</span>
+              <span className="text-slate-900 font-semibold">{consumer.email || 'N/A'}</span>
             </div>
-            <div className="col-span-2">
-              <span className="text-gray-400 font-semibold block">Full Installation Address</span>
-              <span className="text-gray-900 font-medium">{consumer.address}</span>
-            </div>
-            <div>
-              <span className="text-gray-400 font-semibold block">Aadhaar Card No.</span>
-              <span className="font-mono text-gray-900 font-semibold">{consumer.aadhaar_no || '-'}</span>
+            <div className="sm:col-span-2">
+              <span className="text-slate-400 font-bold block">Full Installation Address</span>
+              <span className="text-slate-900 font-medium">{consumer.address}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">PAN Card No.</span>
-              <span className="font-mono text-gray-900 font-semibold">{consumer.pan_no || '-'}</span>
+              <span className="text-slate-400 font-bold block">Aadhaar Card No.</span>
+              <span className="font-mono text-slate-900 font-bold">{consumer.aadhaar_no || 'N/A'}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">Occupation</span>
-              <span className="capitalize text-gray-900 font-medium">{(consumer.occupation || 'N/A').replace(/_/g, ' ')}</span>
+              <span className="text-slate-400 font-bold block">PAN Card No.</span>
+              <span className="font-mono text-slate-900 font-bold uppercase">{consumer.pan_no || 'N/A'}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-semibold block">Land Owned by Consumer</span>
-              <span className="text-gray-900 font-medium">{consumer.land_owned_by_consumer ? 'Yes' : 'No'}</span>
+              <span className="text-slate-400 font-bold block">Electric Bill Name</span>
+              <span className="text-slate-900 font-semibold">{consumer.name_on_electric_bill}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">Occupation</span>
+              <span className="capitalize text-slate-900 font-semibold">{(consumer.occupation || 'N/A').replace(/_/g, ' ')}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">Contact Person Name</span>
+              <span className="text-slate-900 font-semibold">{consumer.contact_person_name || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">Contact Person Phone & Relation</span>
+              <span className="text-slate-900 font-semibold">{consumer.contact_person_phone ? `${consumer.contact_person_phone} (${consumer.contact_person_relation || 'Relation'})` : 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">GPS Coordinates (Lat / Lng)</span>
+              <span className="font-mono text-slate-900 font-bold">
+                {consumer.geo_lat && consumer.geo_lng ? `📍 ${consumer.geo_lat}, ${consumer.geo_lng}` : 'Not geotagged'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">Property Ownership</span>
+              <span className="text-slate-900 font-semibold">{consumer.land_owned_by_consumer ? 'Directly Owned Roof/Land' : 'Rented / Lease'}</span>
             </div>
           </div>
         </div>
 
-        {/* MAC & Bank Loan Card */}
+        {/* Sidebar Cards: MAC Age & Bank Loan */}
         <div className="space-y-6">
-          {/* Surpassed MAC Warning Card */}
-          <div className={`p-6 rounded-2xl border ${isSurpassedMAC ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
-            <h3 className={`text-sm font-bold flex items-center space-x-2 ${isSurpassedMAC ? 'text-rose-900' : 'text-emerald-900'}`}>
-              <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.78-1.34-.25-2.864 1.018-3.836 1.306-1.016 2.888-.918 4.071-.345" />
-              </svg>
-              <span>MAC Age Rule Status</span>
+          {/* MAC Rule Status */}
+          <div className={`p-6 rounded-[28px] border ${isSurpassedMAC ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            <h3 className={`text-sm font-extrabold flex items-center space-x-2 ${isSurpassedMAC ? 'text-rose-900' : 'text-emerald-900'}`}>
+              <span>MAC Age Rule Evaluation</span>
             </h3>
-            <div className="mt-2 text-xs space-y-1">
-              <p className={isSurpassedMAC ? 'text-rose-800' : 'text-emerald-800'}>
-                Consumer Age: <span className="font-bold">{age || 'N/A'} years</span>
+            <div className="mt-2 text-xs space-y-1.5">
+              <p className={isSurpassedMAC ? 'text-rose-800 font-bold' : 'text-emerald-800 font-bold'}>
+                Consumer Age: <span>{age} years</span>
               </p>
               {isSurpassedMAC ? (
                 <p className="text-rose-700 font-semibold">
-                  ⚠️ Age &gt; 64 years: Surpassed MAC limit! Co-applicant or Legal Heir NOC required.
+                  ⚠️ Age &gt; 64 years: Surpassed MAC threshold! Co-applicant or Legal Heir NOC required for DISCOM clearance.
                 </p>
               ) : (
                 <p className="text-emerald-700 font-medium">
-                  ✓ Eligible under standard MAC age rules (&le; 64 years).
+                  ✓ Standard MAC age rule passed (&le; 64 years).
                 </p>
               )}
             </div>
           </div>
 
           {/* Bank Loan Details Card */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-gray-900">Bank Loan Information</h3>
+          <div className="bg-white p-6 rounded-[28px] shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold text-slate-900">Bank Loan Information</h3>
               <button
                 onClick={() => setShowLoanModal(true)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700"
               >
                 {bankLoan ? 'Edit Loan' : '+ Add Loan'}
               </button>
             </div>
 
             {bankLoan ? (
-              <div className="text-xs space-y-2">
+              <div className="text-xs space-y-2.5">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Bank Name:</span>
-                  <span className="font-semibold text-gray-900">{bankLoan.bank_name || 'N/A'}</span>
+                  <span className="text-slate-400 font-bold">Bank Name:</span>
+                  <span className="font-extrabold text-slate-900">{bankLoan.bank_name || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Loan Amount:</span>
-                  <span className="font-bold text-emerald-600">₹{parseFloat(bankLoan.loan_amount || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-slate-400 font-bold">Sanctioned Loan:</span>
+                  <span className="font-extrabold text-emerald-700 font-mono text-sm">₹{parseFloat(bankLoan.loan_amount || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Ghanbani Land:</span>
-                  <span>{bankLoan.is_ghanbani_land ? 'Yes' : 'No'}</span>
+                  <span className="text-slate-400 font-bold">Ghanbani Property:</span>
+                  <span className="font-bold text-slate-800">{bankLoan.is_ghanbani_land ? 'Yes' : 'No'}</span>
                 </div>
                 {bankLoan.remarks && (
-                  <p className="text-gray-500 pt-1 border-t italic">{bankLoan.remarks}</p>
+                  <p className="text-slate-500 pt-2 border-t border-slate-100 italic">{bankLoan.remarks}</p>
                 )}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 italic">No bank loan details registered for this consumer.</p>
+              <p className="text-xs text-slate-400 italic">No bank loan details recorded.</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Consumer Uploaded Documents Grid */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-        <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
-          <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span>Uploaded Consumer Documents ({documents.length})</span>
+      {/* Uploaded Documents Grid */}
+      <div className="bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-4">
+        <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-3">
+          <span>📄 Uploaded Verification Documents ({documents.length})</span>
         </h2>
 
         {documents.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No uploaded documents recorded for this consumer yet.</p>
+          <p className="text-xs text-slate-400 italic">No uploaded documents recorded for this consumer yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {documents.map((doc) => (
-              <div key={doc.id} className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs space-y-2">
+              <div key={doc.id} className="p-4 bg-slate-50 rounded-[20px] border border-slate-200/80 text-xs space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900 capitalize font-mono text-[11px]">
+                  <span className="font-bold text-slate-900 capitalize font-mono text-[11px]">
                     {(doc.doc_type || '').replace(/_/g, ' ')}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                    doc.status === 'verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${doc.status === 'verified' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}>
                     {doc.status}
                   </span>
                 </div>
-                <p className="text-gray-500 font-mono text-[10px] truncate">{doc.file_url || doc.file_name || 'Document File'}</p>
-                <p className="text-gray-400 text-[10px]">Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                <p className="text-slate-500 font-mono text-[10px] truncate">{doc.file_url || doc.file_name || 'Document File'}</p>
+                <p className="text-slate-400 text-[10px]">Uploaded: {new Date(doc.uploaded_at || Date.now()).toLocaleDateString()}</p>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Modal: Add/Edit Bank Loan */}
+      {/* Edit Consumer Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-extrabold text-slate-900">Edit Consumer Details</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditConsumer} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editForm.full_name}
+                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Primary Phone</label>
+                  <input
+                    type="text"
+                    value={editForm.phone_primary}
+                    onChange={(e) => setEditForm({ ...editForm, phone_primary: e.target.value })}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Electric Consumer No.</label>
+                  <input
+                    type="text"
+                    value={editForm.electric_consumer_no}
+                    onChange={(e) => setEditForm({ ...editForm, electric_consumer_no: e.target.value })}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Name on Electric Bill</label>
+                  <input
+                    type="text"
+                    value={editForm.name_on_electric_bill}
+                    onChange={(e) => setEditForm({ ...editForm, name_on_electric_bill: e.target.value })}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Age</label>
+                  <input
+                    type="number"
+                    value={editForm.age}
+                    onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Payment Mode</label>
+                  <select
+                    value={editForm.payment_mode}
+                    onChange={(e) => setEditForm({ ...editForm, payment_mode: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-white"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="bank_loan">Bank Loan</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block font-bold text-slate-700 mb-1">Address</label>
+                  <textarea
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    rows={2}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-5 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-full"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-full hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {savingEdit ? 'Updating...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Bank Loan Modal */}
       {showLoanModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Bank Loan Information</h3>
-            <form onSubmit={handleSaveBankLoan} className="space-y-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900">Bank Loan Information</h3>
+            <form onSubmit={handleSaveBankLoan} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Bank Name</label>
+                <label className="block font-bold text-slate-700 mb-1">Bank Name</label>
                 <input
                   type="text"
                   value={loanForm.bank_name}
                   onChange={(e) => setLoanForm({ ...loanForm, bank_name: e.target.value })}
                   placeholder="e.g. State Bank of India"
                   required
-                  className="w-full px-3 py-2 rounded-xl border text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Sanctioned Loan Amount (₹)</label>
+                <label className="block font-bold text-slate-700 mb-1">Loan Amount (₹)</label>
                 <input
                   type="number"
                   value={loanForm.loan_amount}
                   onChange={(e) => setLoanForm({ ...loanForm, loan_amount: e.target.value })}
                   placeholder="e.g. 75000"
                   required
-                  className="w-full px-3 py-2 rounded-xl border text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
                 />
               </div>
 
-              <label className="flex items-center space-x-2 text-xs font-medium text-gray-700">
+              <label className="flex items-center space-x-2 font-bold text-slate-700">
                 <input
                   type="checkbox"
                   checked={loanForm.is_ghanbani_land}
@@ -321,34 +656,53 @@ const ConsumerDetailsPage = () => {
                 <span>Is Ghanbani Land property?</span>
               </label>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Remarks</label>
-                <textarea
-                  value={loanForm.remarks}
-                  onChange={(e) => setLoanForm({ ...loanForm, remarks: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-xl border text-xs"
-                  placeholder="Additional bank remarks..."
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowLoanModal(false)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-full"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingLoan}
-                  className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-emerald-600 text-white font-bold rounded-full hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {savingLoan ? 'Saving...' : 'Save Loan Info'}
+                  {savingLoan ? 'Saving...' : 'Save Loan'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Confirmation Modal */}
+      {showDeactivateModal && canManageDeactivation && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <div className="h-12 w-12 rounded-[20px] bg-amber-100 text-amber-800 flex items-center justify-center mx-auto text-xl font-bold">
+              🔒
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Deactivate Consumer Profile?</h3>
+            <p className="text-xs text-slate-500">
+              Deactivating <span className="font-bold text-slate-900">{consumer.full_name}</span> will hide this profile from regular users. All linked solar projects, DISCOM meter details, and bank loans remain <span className="font-bold text-slate-900">100% saved in PostgreSQL</span>. Authorized admins can activate them anytime.
+            </p>
+            <div className="flex justify-center space-x-3 pt-2">
+              <button
+                onClick={() => setShowDeactivateModal(false)}
+                className="px-5 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-full"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeactivateConsumer}
+                disabled={deactivating}
+                className="px-5 py-2.5 bg-amber-700 text-white text-xs font-bold rounded-full hover:bg-amber-800 disabled:opacity-50"
+              >
+                {deactivating ? 'Deactivating...' : 'Confirm Deactivation'}
+              </button>
+            </div>
           </div>
         </div>
       )}

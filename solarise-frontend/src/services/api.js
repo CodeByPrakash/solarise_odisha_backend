@@ -57,7 +57,10 @@ export const consumerService = {
   getById: (id) => api.get(`/consumers/${id}`),
   create: (data) => api.post('/consumers', data),
   update: (id, data) => api.put(`/consumers/${id}`, data),
+  deactivate: (id) => api.patch(`/consumers/${id}/deactivate`),
+  activate: (id) => api.patch(`/consumers/${id}/activate`),
   delete: (id) => api.delete(`/consumers/${id}`),
+  restore: (id) => api.patch(`/consumers/${id}/restore`),
 };
 
 // Projects Service

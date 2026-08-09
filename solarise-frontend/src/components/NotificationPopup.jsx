@@ -2,40 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '../services/api';
 
-const DEFAULT_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    title: 'Document Verified',
-    body: 'DISCOM NOC & Geotag site photo verified by Documentation Team.',
-    created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    is_read: false,
-    type: 'document',
-    project_id: 1,
-  },
-  {
-    id: 'n2',
-    title: 'Payment Received',
-    body: 'DISCOM processing fee payment of ₹2,500 cleared by Accounts Desk.',
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    is_read: false,
-    type: 'payment',
-    project_id: 1,
-  },
-  {
-    id: 'n3',
-    title: 'Action Required Raised',
-    body: 'Ownership Transfer requested: Electric bill name correction required.',
-    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    is_read: true,
-    type: 'action',
-    project_id: 2,
-  },
-];
-
 export const NotificationPopup = ({ user }) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all' | 'unread'
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +13,7 @@ export const NotificationPopup = ({ user }) => {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Auto-poll every 30s
+    const interval = setInterval(fetchNotifications, 15000); // Auto-poll real DB notifications every 15s
     return () => clearInterval(interval);
   }, [user]);
 
@@ -62,18 +32,22 @@ export const NotificationPopup = ({ user }) => {
     try {
       setLoading(true);
       let res;
-      if (user?.id) {
-        res = await notificationService.getUserNotifications(user.id);
+      const userId = user?.id || user?.userId;
+      if (userId) {
+        res = await notificationService.getUserNotifications(userId);
       } else {
         res = await notificationService.getAll();
       }
 
-      const rawList = res.data?.notifications || res.data?.data || res.data || [];
-      if (Array.isArray(rawList) && rawList.length > 0) {
+      const rawList = res.data?.notifications || res.data?.data || [];
+      if (Array.isArray(rawList)) {
         setNotifications(rawList);
+      } else {
+        setNotifications([]);
       }
     } catch (err) {
-      console.warn('Using default demo notifications fallback:', err);
+      console.error('Error fetching system notifications:', err);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -93,7 +67,6 @@ export const NotificationPopup = ({ user }) => {
   const handleMarkAllAsRead = async () => {
     try {
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      // Call markRead for all unread items
       const unread = notifications.filter((n) => !n.is_read);
       await Promise.allSettled(unread.map((n) => notificationService.markRead(n.id)));
     } catch (err) {
@@ -117,10 +90,15 @@ export const NotificationPopup = ({ user }) => {
 
     if (item.project_id) {
       navigate(`/projects/${item.project_id}`);
-    } else if (item.type === 'document') {
-      navigate('/documents');
-    } else if (item.type === 'payment') {
-      navigate('/payments');
+    } else {
+      const text = (item.title + ' ' + (item.body || '')).toLowerCase();
+      if (text.includes('doc') || text.includes('noc') || text.includes('upload')) {
+        navigate('/documents');
+      } else if (text.includes('pay') || text.includes('fee') || text.includes('amount')) {
+        navigate('/payments');
+      } else if (text.includes('action') || text.includes('correct') || text.includes('transfer')) {
+        navigate('/action-required');
+      }
     }
   };
 
@@ -134,6 +112,8 @@ export const NotificationPopup = ({ user }) => {
   const formatTime = (isoString) => {
     if (!isoString) return 'Just now';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'Just now';
+    
     const diffMins = Math.floor((Date.now() - date.getTime()) / (1000 * 60));
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
@@ -142,8 +122,10 @@ export const NotificationPopup = ({ user }) => {
     return date.toLocaleDateString();
   };
 
-  const getIcon = (type) => {
-    if (type === 'payment') {
+  const getIcon = (item) => {
+    const text = ((item.title || '') + ' ' + (item.body || '')).toLowerCase();
+
+    if (text.includes('pay') || text.includes('fee') || text.includes('amount') || text.includes('cleared')) {
       return (
         <div className="h-8 w-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,7 +134,7 @@ export const NotificationPopup = ({ user }) => {
         </div>
       );
     }
-    if (type === 'action') {
+    if (text.includes('action') || text.includes('correct') || text.includes('transfer') || text.includes('reject') || text.includes('require')) {
       return (
         <div className="h-8 w-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,7 +143,7 @@ export const NotificationPopup = ({ user }) => {
         </div>
       );
     }
-    if (type === 'document') {
+    if (text.includes('doc') || text.includes('noc') || text.includes('verify') || text.includes('upload') || text.includes('file')) {
       return (
         <div className="h-8 w-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,7 +187,7 @@ export const NotificationPopup = ({ user }) => {
           {/* Header */}
           <div className="p-4 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
+              <h3 className="font-bold text-gray-900 text-sm">System Notifications</h3>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800">
                   {unreadCount} Unread
@@ -227,17 +209,15 @@ export const NotificationPopup = ({ user }) => {
           <div className="px-4 py-2 bg-white border-b border-gray-100 flex items-center space-x-2 text-xs">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded-lg font-semibold transition ${
-                filter === 'all' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${filter === 'all' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-500 hover:bg-gray-100'
+                }`}
             >
               All ({notifications.length})
             </button>
             <button
               onClick={() => setFilter('unread')}
-              className={`px-3 py-1 rounded-lg font-semibold transition ${
-                filter === 'unread' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${filter === 'unread' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-500 hover:bg-gray-100'
+                }`}
             >
               Unread ({unreadCount})
             </button>
@@ -245,7 +225,11 @@ export const NotificationPopup = ({ user }) => {
 
           {/* Notification Items List */}
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-            {filteredNotifications.length === 0 ? (
+            {loading && notifications.length === 0 ? (
+              <div className="py-8 text-center px-4">
+                <p className="text-xs font-semibold text-gray-400 animate-pulse">Loading notifications...</p>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="py-8 text-center px-4">
                 <svg className="h-10 w-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -258,27 +242,28 @@ export const NotificationPopup = ({ user }) => {
                 <div
                   key={item.id}
                   onClick={() => handleNotificationClick(item)}
-                  className={`p-3.5 flex items-start space-x-3 transition cursor-pointer hover:bg-gray-50 relative ${
-                    !item.is_read ? 'bg-emerald-50/30' : ''
-                  }`}
+                  className={`p-3.5 flex items-start space-x-3 transition cursor-pointer hover:bg-gray-50 relative ${!item.is_read ? 'bg-emerald-50/30' : ''
+                    }`}
                 >
                   {/* Category Icon */}
-                  {getIcon(item.type)}
+                  {getIcon(item)}
 
                   {/* Body Content */}
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex justify-between items-start">
                       <h4 className={`text-xs font-semibold text-gray-900 truncate ${!item.is_read ? 'font-bold' : ''}`}>
-                        {item.title || item.message}
+                        {item.title}
                       </h4>
                       <span className="text-[10px] text-gray-400 font-mono ml-2 shrink-0">
                         {formatTime(item.created_at)}
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">
-                      {item.body || item.detail || item.message}
-                    </p>
+                    {item.body && (
+                      <p className="text-[11px] text-gray-600 mt-0.5 line-clamp-2 leading-relaxed">
+                        {item.body}
+                      </p>
+                    )}
 
                     {item.project_id && (
                       <span className="inline-block mt-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
