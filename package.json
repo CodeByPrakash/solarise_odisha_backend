@@ -1,0 +1,12 @@
+{
+  "name": "solarise-odisha-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd solarise-api && npm run dev",
+    "start": "cd solarise-api && npm start"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0"
+  }
+}

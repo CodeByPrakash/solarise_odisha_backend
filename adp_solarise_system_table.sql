@@ -79,7 +79,8 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    full_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
     email CITEXT UNIQUE NOT NULL,
     phone VARCHAR(15) UNIQUE NOT NULL,
     role user_role NOT NULL DEFAULT 'agent',
@@ -97,7 +98,8 @@ CREATE TABLE IF NOT EXISTS area_blocks (
 
 CREATE TABLE IF NOT EXISTS consumers (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    full_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
     address TEXT NOT NULL,
     area_block_id BIGINT NOT NULL REFERENCES area_blocks(id),
     email CITEXT,
