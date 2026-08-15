@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
+import { validateMobile, validateEmail } from "../utils/validators.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "8h";
@@ -49,9 +50,17 @@ export const register = async (req, res) => {
             last_name = parts.slice(1).join(" ") || "User";
         }
 
+
+
         if (!first_name || !last_name || !email || !phone || !password) {
             return res.status(400).json({ error: "first_name, last_name (or full_name), email, phone, and password are required" });
         }
+
+        const emailCheck = validateEmail(email);
+        if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.error });
+
+        const phoneCheck = validateMobile(phone);
+        if (!phoneCheck.valid) return res.status(400).json({ error: phoneCheck.error });
 
         const targetRole = role || "agent";
 
@@ -113,13 +122,20 @@ export const login = async (req, res) => {
         }
 
         let passwordMatches = false;
-        if (user.password_hash === password) {
+        try {
+            passwordMatches = await bcrypt.compare(password, user.password_hash);
+        } catch (e) {
+            passwordMatches = false;
+        }
+
+        // Backward compatibility: Auto-upgrade legacy plain-text password to bcrypt hash on successful login
+        if (!passwordMatches && user.password_hash === password) {
             passwordMatches = true;
-        } else {
             try {
-                passwordMatches = await bcrypt.compare(password, user.password_hash);
-            } catch (e) {
-                passwordMatches = false;
+                const newHash = await bcrypt.hash(password, 10);
+                await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, user.id]);
+            } catch (upgradeErr) {
+                console.error("Error auto-upgrading user password hash:", upgradeErr);
             }
         }
 

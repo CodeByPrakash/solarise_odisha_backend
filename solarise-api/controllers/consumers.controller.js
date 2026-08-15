@@ -1,33 +1,76 @@
 import pool from "../config/db.js";
+import { validateMobile, validateEmail, validatePAN, validateAadhaar } from "../utils/validators.js";
+
+const validateConsumerData = (data) => {
+    if (data.phone_primary) {
+        const check = validateMobile(data.phone_primary, "Primary phone number");
+        if (!check.valid) return check.error;
+    }
+    if (data.phone_secondary) {
+        const check = validateMobile(data.phone_secondary, "Secondary phone number");
+        if (!check.valid) return check.error;
+    }
+    if (data.contact_person_phone) {
+        const check = validateMobile(data.contact_person_phone, "Contact person phone");
+        if (!check.valid) return check.error;
+    }
+    if (data.phone_on_electric_bill) {
+        const check = validateMobile(data.phone_on_electric_bill, "Phone on electric bill");
+        if (!check.valid) return check.error;
+    }
+    if (data.email) {
+        const check = validateEmail(data.email, "Consumer email");
+        if (!check.valid) return check.error;
+    }
+    if (data.pan_no) {
+        const check = validatePAN(data.pan_no);
+        if (!check.valid) return check.error;
+    }
+    if (data.aadhaar_no) {
+        const check = validateAadhaar(data.aadhaar_no);
+        if (!check.valid) return check.error;
+    }
+    return null;
+};
 
 export const getAllConsumers = async (req, res) => {
     try {
         const userId = req.user?.userId || req.user?.id;
         const role = req.user?.role;
 
-        let query = "SELECT id, full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, is_active, created_by, created_at FROM consumers";
+        let query = `
+            SELECT c.*,
+                   ab.name AS area_block_name,
+                   u.first_name AS creator_first_name,
+                   u.last_name AS creator_last_name,
+                   u.role AS creator_role,
+                   u.email AS creator_email
+            FROM consumers c
+            LEFT JOIN area_blocks ab ON c.area_block_id = ab.id
+            LEFT JOIN users u ON c.created_by = u.id
+        `;
         const conditions = [];
         const params = [];
 
         // Regular roles (agent, site_manager, accounts) ONLY see active consumers (is_active = TRUE)
         const canSeeInactive = ['admin', 'doc_team'].includes(role);
         if (!canSeeInactive) {
-            conditions.push("is_active = TRUE");
+            conditions.push("c.is_active = TRUE");
         }
 
         if (role === 'agent') {
             params.push(userId);
-            conditions.push(`created_by = $${params.length}`);
+            conditions.push(`c.created_by = $${params.length}`);
         } else if (role === 'site_manager') {
             params.push(userId);
-            conditions.push(`(created_by = $${params.length} OR id IN (SELECT consumer_id FROM projects WHERE assigned_site_manager = $${params.length}))`);
+            conditions.push(`(c.created_by = $${params.length} OR c.id IN (SELECT consumer_id FROM projects WHERE assigned_site_manager = $${params.length}))`);
         }
 
         if (conditions.length > 0) {
             query += " WHERE " + conditions.join(" AND ");
         }
 
-        query += " ORDER BY created_at DESC";
+        query += " ORDER BY c.created_at DESC";
 
         const result = await pool.query(query, params);
         res.status(200).json({ count: result.rowCount, data: result.rows });
@@ -43,9 +86,14 @@ export const getConsumerById = async (req, res) => {
         const result = await pool.query(
             `SELECT c.*,
               ab.id AS area_block_id,
-              ab.name AS area_block_name
+              ab.name AS area_block_name,
+              u.first_name AS creator_first_name,
+              u.last_name AS creator_last_name,
+              u.role AS creator_role,
+              u.email AS creator_email
        FROM consumers c
        LEFT JOIN area_blocks ab ON c.area_block_id = ab.id
+       LEFT JOIN users u ON c.created_by = u.id
        WHERE c.id = $1`,
             [id]
         );
@@ -96,6 +144,11 @@ export const createConsumer = async (req, res) => {
             created_by
         } = req.body;
 
+        const valError = validateConsumerData(req.body);
+        if (valError) {
+            return res.status(400).json({ error: valError });
+        }
+
         const effectiveCreatedBy = created_by || req.user?.userId || req.user?.id || 1;
 
         const result = await pool.query(
@@ -129,9 +182,14 @@ export const createConsumer = async (req, res) => {
                    i.land_owned_by_consumer,
                    i.occupation,
                    i.is_active,
-                   i.created_by
+                   i.created_by,
+                   u.first_name AS creator_first_name,
+                   u.last_name AS creator_last_name,
+                   u.role AS creator_role,
+                   u.email AS creator_email
             FROM inserted_consumer i
-            LEFT JOIN area_blocks ab ON i.area_block_id = ab.id`,
+            LEFT JOIN area_blocks ab ON i.area_block_id = ab.id
+            LEFT JOIN users u ON i.created_by = u.id`,
             [full_name, address, area_block_id || 1, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, effectiveCreatedBy]
         );
         res.status(200).json({
@@ -171,6 +229,11 @@ export const updateConsumer = async (req, res) => {
             land_owned_by_consumer,
             occupation
         } = req.body;
+
+        const valError = validateConsumerData(req.body);
+        if (valError) {
+            return res.status(400).json({ error: valError });
+        }
 
         const result = await pool.query(
             `WITH updated_consumer AS (

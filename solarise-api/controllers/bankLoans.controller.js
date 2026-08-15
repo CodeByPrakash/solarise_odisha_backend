@@ -48,7 +48,7 @@ export const getBankLoanByConsumer = async (req, res) => {
             WHERE bl.consumer_id = $1
         `, [consumerId]);
         if (result.rowCount === 0) {
-            return res.status(404).json({ error: "No bank loan found for this consumer" });
+            return res.status(200).json({ data: null, message: "No bank loan record found for this consumer" });
         }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) {

@@ -17,6 +17,7 @@ import installationProgressRoutes from "./routes/installationProgress.routes.js"
 import paymentsRoutes from "./routes/payments.routes.js";
 import statusHistoryRoutes from "./routes/statusHistory.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
+import transfersRoutes from "./routes/transfers.routes.js";
 import { authenticateToken } from "./middleware/auth.middleware.js";
 
 // import bcrypt from "bcryptjs";
@@ -29,7 +30,8 @@ import swaggerSpec from "./swagger.js";
 
 
 const app = express();
-const PORT = process.env.PORT || 'your_port';
+const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(express.json());
@@ -75,6 +77,7 @@ app.use("/api/installation", installationProgressRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/status-history", statusHistoryRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/transfers", transfersRoutes);
 
 // bcrypt.hash('chinu123', 10).then(hash => console.log(hash));
 
@@ -89,6 +92,6 @@ pool.query("SELECT NOW()", (err, res) => {
     console.log(res.rows);
 });
 
-app.listen(PORT, () => {
-    console.log(`Server port ${PORT}`);
+app.listen(PORT, HOST, () => {
+    console.log(`Server running on port ${PORT} bound to ${HOST} (Wi-Fi accessible)`);
 });

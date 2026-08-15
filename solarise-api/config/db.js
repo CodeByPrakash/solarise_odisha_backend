@@ -7,7 +7,10 @@ const pool = new pg.Pool({
     database: process.env.DB_NAME || "db_name",
     password: process.env.DB_PASSWORD || "your_password",
     port: process.env.DB_PORT || 'portno',
-    options: "-c search_path=solarise"
+    options: "-c search_path=solarise",
+    max: 20, // Maximum connections in pool
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
 });
 
 pool.on('connect', () => {
