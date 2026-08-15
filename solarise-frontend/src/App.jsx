@@ -18,6 +18,7 @@ import NewPaymentPage from './pages/payments/NewPaymentPage';
 import PaymentDetailsPage from './pages/payments/PaymentDetailsPage';
 import UsersPage from './pages/users/UsersPage';
 import AreaBlocksPage from './pages/areaBlocks/AreaBlocksPage';
+import UserProfilePage from './pages/profile/UserProfilePage';
 import { useAuth } from './context/AuthContext';
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
           <Route path="payments/:id" element={<PaymentDetailsPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="area-blocks" element={<AreaBlocksPage />} />
+          <Route path="profile" element={<UserProfilePage />} />
         </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

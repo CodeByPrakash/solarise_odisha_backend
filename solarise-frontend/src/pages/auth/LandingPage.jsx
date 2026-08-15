@@ -49,8 +49,10 @@ const LandingPage = () => {
         <div className="bg-white/90 backdrop-blur-xl rounded-full border border-slate-200/80 shadow-sm p-3 px-6 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 rounded-[14px] bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-0.5 shadow-sm">
-              <div className="h-full w-full bg-white rounded-[12px] flex items-center justify-center text-emerald-600 font-bold text-lg">
-                ☀️
+              <div className="h-full w-full bg-white rounded-[12px] flex items-center justify-center text-emerald-600">
+                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               </div>
             </div>
             <div>
@@ -168,8 +170,10 @@ const LandingPage = () => {
                       placeholder="e.g. admin@solarise.gov.in or 9876543210"
                       className="w-full pl-11 pr-4 py-3 rounded-[16px] border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                     />
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                      👤
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -189,8 +193,10 @@ const LandingPage = () => {
                       placeholder="Enter security password"
                       className="w-full pl-11 pr-10 py-3 rounded-[16px] border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                     />
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                      🔒
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
                     </div>
                     <button
                       type="button"
@@ -261,8 +267,10 @@ const LandingPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1 */}
           <div className="bg-white p-8 rounded-[28px] border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4">
-            <div className="h-12 w-12 rounded-[18px] bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center text-xl shadow-2xs">
-              📦
+            <div className="h-12 w-12 rounded-[18px] bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shadow-2xs">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
             </div>
             <h3 className="text-lg font-bold text-slate-900">Multi-Batch Material Delivery</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -272,8 +280,10 @@ const LandingPage = () => {
 
           {/* Card 2 */}
           <div className="bg-white p-8 rounded-[28px] border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4">
-            <div className="h-12 w-12 rounded-[18px] bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center text-xl shadow-2xs">
-              📍
+            <div className="h-12 w-12 rounded-[18px] bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shadow-2xs">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
             </div>
             <h3 className="text-lg font-bold text-slate-900">Geotagged Photo Inspection</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -283,8 +293,10 @@ const LandingPage = () => {
 
           {/* Card 3 */}
           <div className="bg-white p-8 rounded-[28px] border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4">
-            <div className="h-12 w-12 rounded-[18px] bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center text-xl shadow-2xs">
-              💳
+            <div className="h-12 w-12 rounded-[18px] bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center shadow-2xs">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
             </div>
             <h3 className="text-lg font-bold text-slate-900">Automated Subsidy Clearance</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
@@ -306,8 +318,10 @@ const LandingPage = () => {
             </button>
 
             <div className="text-center space-y-2">
-              <div className="h-12 w-12 rounded-[20px] bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center mx-auto text-xl shadow-2xs">
-                ☀️
+              <div className="h-12 w-12 rounded-[20px] bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center mx-auto shadow-2xs">
+                <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               </div>
               <h3 className="text-xl font-extrabold text-slate-900">Sign In to Solarise</h3>
               <p className="text-xs text-slate-500">Access your project pipelines and operations</p>

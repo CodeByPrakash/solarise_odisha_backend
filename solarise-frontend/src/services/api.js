@@ -1,8 +1,22 @@
 import axios from 'axios';
 
-// Create an axios instance with base URL from environment variable
+// Dynamically determine base URL so Wi-Fi IP access works automatically on mobile/other devices
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      if (envUrl) {
+        return envUrl.replace('localhost', hostname).replace('127.0.0.1', hostname);
+      }
+      return `http://${hostname}:5000/api`;
+    }
+  }
+  return envUrl || 'http://localhost:5000/api';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
 });
 
 // Request interceptor to add auth token (if available)
@@ -19,13 +33,53 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Helper to extract clean error message from backend responses or network failures
+const extractErrorMessage = (error) => {
+  if (error.response) {
+    const status = error.response.status;
+    const data = error.response.data;
+
+    if (typeof data === 'string' && data.trim()) return data;
+    if (data && data.error && typeof data.error === 'string') return data.error;
+    if (data && data.message && typeof data.message === 'string') return data.message;
+
+    if (status === 400) return 'Invalid request data or validation failure.';
+    if (status === 401) return 'Session expired or unauthenticated. Please log in again.';
+    if (status === 403) return 'Access denied. You do not have permission for this action.';
+    if (status === 404) return 'The requested resource was not found on the server.';
+    if (status === 409) return 'Data conflict. Record already exists in system.';
+    if (status >= 500) return 'Backend Internal Server Exception (500). Please check server logs.';
+  } else if (error.request) {
+    return 'Unable to connect to backend server. Please verify network or Wi-Fi connection.';
+  }
+  return error.message || 'An unknown network error occurred.';
+};
+
+// Response interceptor to handle errors globally with custom toasts
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error.response?.status;
+    if (status === 401) {
       localStorage.removeItem('token');
     }
+
+    const errorMessage = extractErrorMessage(error);
+    const title = status ? `Backend Error ${status}` : 'Connection Refused';
+
+    if (!error.config?.suppressToast && typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(
+        new CustomEvent('app:toast', {
+          detail: {
+            type: 'error',
+            title,
+            message: errorMessage,
+            duration: 5000,
+          },
+        })
+      );
+    }
+
     return Promise.reject(error);
   }
 );
@@ -90,7 +144,7 @@ export const documentService = {
 
 // Bank Loans Service
 export const bankLoanService = {
-  getByConsumer: (consumerId) => api.get(`/bank-loans/consumer/${consumerId}`),
+  getByConsumer: (consumerId) => api.get(`/bank-loans/consumer/${consumerId}`, { suppressToast: true }),
   createOrUpdate: (data) => api.post('/bank-loans', data),
 };
 
@@ -131,6 +185,14 @@ export const notificationService = {
   create: (data) => api.post('/notifications', data),
   markRead: (id) => api.patch(`/notifications/${id}/read`),
   delete: (id) => api.delete(`/notifications/${id}`),
+};
+
+// Consumer Transfers Service
+export const transferService = {
+  initiate: (data) => api.post('/transfers', data),
+  getPending: () => api.get('/transfers/pending'),
+  accept: (id) => api.post(`/transfers/${id}/accept`),
+  reject: (id) => api.post(`/transfers/${id}/reject`),
 };
 
 export default api;

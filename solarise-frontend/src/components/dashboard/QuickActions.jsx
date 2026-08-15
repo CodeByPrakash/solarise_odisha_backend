@@ -46,7 +46,9 @@ const QuickActions = () => {
         <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
           <div className="flex items-center space-x-2.5">
             <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-bold text-sm shadow-2xs">
-              🎯
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
             </div>
             <h3 className="text-lg font-bold text-slate-900">Quick Action Hub</h3>
           </div>

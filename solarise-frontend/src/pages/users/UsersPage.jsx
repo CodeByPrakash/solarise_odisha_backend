@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { userService } from '../../services/api';
+import { validateEmail, validateMobile } from '../../utils/validators';
 import { Button } from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
 
@@ -29,9 +32,13 @@ const ALLOWED_ROLE_CREATION = {
 };
 
 const UsersPage = () => {
-  const { user: currentUser } = useAuth();
-  const creatorRole = currentUser?.role || 'agent';
-  const currentUserId = String(currentUser?.id || currentUser?.userId || '');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+
+  const { user } = useAuth();
+  const { showSuccess, showError, showWarning } = useToast();
+  const creatorRole = user?.role || 'agent';
+  const currentUserId = String(user?.id || user?.userId || '');
   const allowedRolesToAssign = ALLOWED_ROLE_CREATION[creatorRole] || ['agent'];
   const isAdmin = creatorRole === 'admin';
 
@@ -40,7 +47,7 @@ const UsersPage = () => {
   const [error, setError] = useState(null);
 
   // Search and Filter states
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [roleFilter, setRoleFilter] = useState('all');
 
   // Create User Modal state
@@ -98,9 +105,23 @@ const UsersPage = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setModalError('');
+
+    const emailErr = validateEmail(newUserForm.email, 'Email address');
+    if (emailErr) {
+      setModalError(emailErr);
+      return;
+    }
+
+    const phoneErr = validateMobile(newUserForm.phone, 'Phone number');
+    if (phoneErr) {
+      setModalError(phoneErr);
+      return;
+    }
+
     try {
       setSubmitting(true);
       await userService.create(newUserForm);
+      showSuccess(`Account for ${newUserForm.first_name} ${newUserForm.last_name} created successfully!`, 'User Created');
       setShowCreateModal(false);
       setNewUserForm({
         first_name: '',
@@ -137,18 +158,35 @@ const UsersPage = () => {
 
     const isSelf = String(editingUser.id) === currentUserId;
     if (isSelf && editForm.is_active === false) {
-      alert('Security Protection: You cannot deactivate your own active session account.');
+      showWarning('Security Protection: You cannot deactivate your own active session account.');
       return;
+    }
+
+    if (editForm.email) {
+      const emailErr = validateEmail(editForm.email, 'Email address');
+      if (emailErr) {
+        showError(emailErr);
+        return;
+      }
+    }
+
+    if (editForm.phone) {
+      const phoneErr = validateMobile(editForm.phone, 'Phone number');
+      if (phoneErr) {
+        showError(phoneErr);
+        return;
+      }
     }
 
     try {
       setUpdating(true);
       await userService.update(editingUser.id, editForm);
+      showSuccess('User account updated successfully!', 'Profile Updated');
       setShowEditModal(false);
       setEditingUser(null);
       await fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update user details');
+      // Handled globally by response interceptor toast
     } finally {
       setUpdating(false);
     }
@@ -157,7 +195,7 @@ const UsersPage = () => {
   const handleToggleActiveStatus = async (u) => {
     const isSelf = String(u.id) === currentUserId;
     if (isSelf) {
-      alert('Security Protection: You cannot deactivate your own active session account.');
+      showWarning('Security Protection: You cannot deactivate your own active session account.');
       return;
     }
 
@@ -172,9 +210,10 @@ const UsersPage = () => {
         role: u.role,
         is_active: !u.is_active,
       });
+      showSuccess(`User account ${action}d successfully.`, 'Status Changed');
       await fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.error || `Failed to ${action} user account`);
+      // Handled globally by response interceptor toast
     }
   };
 

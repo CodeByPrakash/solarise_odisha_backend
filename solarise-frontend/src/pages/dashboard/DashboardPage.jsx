@@ -4,6 +4,7 @@ import PipelineChart from '../../components/dashboard/PipelineChart';
 import RevenueTrendChart from '../../components/dashboard/RevenueTrendChart';
 import RecentActivity from '../../components/dashboard/RecentActivity';
 import QuickActions from '../../components/dashboard/QuickActions';
+import IncomingTransfers from '../../components/dashboard/IncomingTransfers';
 
 const DashboardPage = () => {
   return (
@@ -17,8 +18,10 @@ const DashboardPage = () => {
           <div className="flex items-center space-x-3">
             {/* Android Squircle Logo Icon */}
             <div className="h-12 w-12 rounded-[20px] bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-0.5 shadow-md shadow-emerald-500/10">
-              <div className="h-full w-full bg-white rounded-[18px] flex items-center justify-center text-emerald-600 font-bold text-xl shadow-inner">
-                ☀️
+              <div className="h-full w-full bg-white rounded-[18px] flex items-center justify-center text-emerald-600 shadow-inner">
+                <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
               </div>
             </div>
             <div>
@@ -47,6 +50,11 @@ const DashboardPage = () => {
           </span>
         </div>
       </header>
+
+      {/* 0. Incoming Transfers Alert */}
+      <section className="relative z-10">
+        <IncomingTransfers />
+      </section>
 
       {/* 1. Top Section: Android Material 3 Stats Grid */}
       <section className="relative z-10">
