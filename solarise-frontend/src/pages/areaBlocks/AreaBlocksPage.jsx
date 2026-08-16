@@ -342,7 +342,7 @@ const AreaBlocksPage = () => {
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteBlock(b)}
-                            className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-full border border-rose-200 transition"
+                            className="cursor-pointer px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-full border border-rose-200 transition"
                           >
                             🗑️ Delete
                           </button>
