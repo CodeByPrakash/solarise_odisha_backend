@@ -1,25 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentService, consumerService, actionService } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 import { ALL_DOCUMENT_TYPES } from '../../constants/documentTypes';
 
 const DocumentUploadPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const [consumers, setConsumers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [flaggedDocs, setFlaggedDocs] = useState([]);
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'resolve'
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const [form, setForm] = useState({
     consumer_id: '',
     doc_type: 'electric_bill',
     file_name: '',
-    file_url: '',
-    mime_type: 'image/jpeg',
     geo_lat: '',
     geo_lng: '',
   });
@@ -96,29 +93,41 @@ const DocumentUploadPage = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+    if (file) {
+      setForm((prev) => ({
+        ...prev,
+        file_name: prev.file_name || file.name,
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const dummyUrl = form.file_url || `https://storage.solarise.odisha.gov.in/docs/${form.doc_type}_${Date.now()}.jpg`;
-      const res = await documentService.create({
-        consumer_id: form.consumer_id,
-        doc_type: form.doc_type,
-        file_url: dummyUrl,
-        file_name: form.file_name || `${form.doc_type}_document.jpg`,
-        mime_type: form.mime_type,
-        geo_lat: form.geo_lat ? parseFloat(form.geo_lat) : null,
-        geo_lng: form.geo_lng ? parseFloat(form.geo_lng) : null,
-        uploaded_by: user?.id || 1,
-      });
+      if (!selectedFile) {
+        throw new Error('Choose a document file to upload.');
+      }
+
+      const payload = new FormData();
+      payload.append('file', selectedFile);
+      payload.append('consumer_id', form.consumer_id);
+      payload.append('doc_type', form.doc_type);
+      payload.append('file_name', form.file_name || selectedFile.name);
+      if (form.geo_lat) payload.append('geo_lat', form.geo_lat);
+      if (form.geo_lng) payload.append('geo_lng', form.geo_lng);
+      const res = await documentService.upload(payload);
 
       const newId = res.data?.data?.id || res.data?.id;
       navigate(newId ? `/documents/${newId}` : '/documents');
     } catch (err) {
       console.error('Error uploading document:', err);
-      setError(err.response?.data?.error || 'Failed to record document upload');
+      setError(err.response?.data?.error || err.message || 'Failed to upload document');
     } finally {
       setLoading(false);
     }
@@ -303,15 +312,14 @@ const DocumentUploadPage = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">File URL / Cloud Storage Path</label>
-          <input
-            type="text"
-            name="file_url"
-            value={form.file_url}
-            onChange={handleChange}
-            placeholder="https://storage.solarise.odisha.gov.in/docs/sample.jpg"
-            className="w-full px-3 py-2 rounded-xl border text-xs font-mono"
-          />
+          <span className="block text-xs font-semibold text-gray-700 mb-2">Document file *</span>
+          <label className="block border-2 border-dashed border-emerald-200 bg-emerald-50/50 rounded-2xl p-5 cursor-pointer hover:border-emerald-400 transition">
+            <span className="block text-xs font-bold text-emerald-900">Choose a document from your device</span>
+            <span className="block text-[10px] text-slate-500 mt-1">PDF, JPG, PNG, WEBP, or MP4 up to 5 MB</span>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4" onChange={handleFileChange} className="sr-only" />
+            <span className="mt-3 inline-flex items-center px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">{selectedFile ? 'Change file' : 'Browse files'}</span>
+            {selectedFile && <span className="block mt-2 text-xs font-semibold text-slate-700 truncate">{selectedFile.name} ({Math.ceil(selectedFile.size / 1024)} KB)</span>}
+          </label>
         </div>
 
         {/* GPS Geotagging Card */}

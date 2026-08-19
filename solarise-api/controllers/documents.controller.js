@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import { notifyUsers } from "../utils/notificationHelper.js";
+import { deleteFileFromS3, uploadFileToS3 } from "../services/s3Storage.js";
 
 // GET /api/documents - List all documents (filtered by role)
 export const getAllDocuments = async (req, res) => {
@@ -409,5 +410,29 @@ export const flagDocument = async (req, res) => {
         res.status(500).json({ error: err.message });
     } finally {
         client.release();
+    }
+};
+
+export const uploadDocument = async (req, res) => {
+    let uploadedObject;
+    try {
+        const { consumer_id, doc_type, file_name, geo_lat, geo_lng } = req.body;
+        const uploaded_by = req.user?.userId || req.user?.id;
+        if (!consumer_id || !doc_type || !req.file || !uploaded_by) {
+            return res.status(400).json({ error: "consumer_id, doc_type, file, and an authenticated uploader are required" });
+        }
+
+        uploadedObject = await uploadFileToS3({ file: req.file, consumerId: consumer_id, documentType: doc_type });
+        const result = await pool.query(`
+            INSERT INTO documents (consumer_id, doc_type, file_url, file_name, mime_type, geo_lat, geo_lng, uploaded_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `, [consumer_id, doc_type, uploadedObject.url, file_name || req.file.originalname, req.file.mimetype, geo_lat || null, geo_lng || null, uploaded_by]);
+
+        res.status(201).json({ data: result.rows[0] });
+    } catch (err) {
+        if (uploadedObject?.key) await deleteFileFromS3(uploadedObject.key).catch(() => {});
+        if (err.code === "23503") return res.status(400).json({ error: "Referenced consumer or authenticated user does not exist" });
+        res.status(400).json({ error: err.message || "File upload failed" });
     }
 };

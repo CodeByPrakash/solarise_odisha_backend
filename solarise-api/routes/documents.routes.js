@@ -4,6 +4,7 @@ import {
     getDocumentById,
     getDocumentsByConsumer,
     createDocument,
+    uploadDocument,
     verifyDocument,
     rejectDocument,
     reuploadDocument,
@@ -11,6 +12,7 @@ import {
     getDocumentStatusSummary,
 } from "../controllers/documents.controller.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
+import { documentUpload } from "../middleware/upload.middleware.js";
 
 const router = Router();
 
@@ -108,6 +110,7 @@ router.get("/:id", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team
  *         description: Document created
  */
 router.post("/", authenticateToken, authorizeRoles('agent', 'doc_team', 'admin', 'site_manager'), createDocument);
+router.post("/upload", authenticateToken, authorizeRoles('agent', 'doc_team', 'admin', 'site_manager'), documentUpload.single("file"), uploadDocument);
 
 /**
  * @swagger
