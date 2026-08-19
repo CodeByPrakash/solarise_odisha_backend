@@ -128,6 +128,23 @@ CREATE TABLE IF NOT EXISTS consumers (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS consumer_transfers (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    consumer_id BIGINT NOT NULL REFERENCES consumers(id) ON DELETE CASCADE,
+    from_agent_id BIGINT NOT NULL REFERENCES users(id),
+    to_agent_id BIGINT NOT NULL REFERENCES users(id),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'rejected')),
+    remarks TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_consumer_transfer_agents CHECK (from_agent_id <> to_agent_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_consumer_transfers_pending
+    ON consumer_transfers (consumer_id)
+    WHERE status = 'pending';
+
 CREATE TABLE IF NOT EXISTS bank_loans (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     consumer_id BIGINT NOT NULL UNIQUE REFERENCES consumers(id) ON DELETE CASCADE,

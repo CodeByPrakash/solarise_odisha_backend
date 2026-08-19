@@ -156,7 +156,8 @@ CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'refunded', 'failed');
 
 CREATE TABLE users (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  full_name     TEXT NOT NULL,
+  first_name    TEXT NOT NULL,
+  last_name     TEXT NOT NULL,
   email         CITEXT UNIQUE NOT NULL,
   phone         VARCHAR(15) UNIQUE NOT NULL,
   role          user_role NOT NULL DEFAULT 'agent',
@@ -205,6 +206,23 @@ CREATE TABLE consumers (
     OR (geo_lat BETWEEN -90 AND 90 AND geo_lng BETWEEN -180 AND 180)
   )
 );
+
+CREATE TABLE consumer_transfers (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  consumer_id   BIGINT NOT NULL REFERENCES consumers(id) ON DELETE CASCADE,
+  from_agent_id BIGINT NOT NULL REFERENCES users(id),
+  to_agent_id   BIGINT NOT NULL REFERENCES users(id),
+  status        TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'accepted', 'rejected')),
+  remarks       TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_consumer_transfer_agents CHECK (from_agent_id <> to_agent_id)
+);
+
+CREATE UNIQUE INDEX uq_consumer_transfers_pending
+  ON consumer_transfers (consumer_id)
+  WHERE status = 'pending';
 
 CREATE TABLE bank_loans (
   id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

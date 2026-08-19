@@ -224,8 +224,10 @@ const AreaBlocksPage = () => {
             placeholder="Search blocks by name or district..."
             className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
           />
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-            🔍
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
 
@@ -266,8 +268,10 @@ const AreaBlocksPage = () => {
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200/80 overflow-hidden">
         {filteredBlocks.length === 0 ? (
           <div className="text-center py-12 px-4">
-            <div className="h-12 w-12 rounded-[20px] bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-xl font-bold">
-              🗺️
+            <div className="h-12 w-12 rounded-[20px] bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
             </div>
             <h3 className="text-base font-extrabold text-slate-900">No Area Blocks Found</h3>
             <p className="text-xs text-slate-500 mt-1">No geographic blocks match your search or filter parameters.</p>
@@ -292,8 +296,10 @@ const AreaBlocksPage = () => {
 
                   <Table.Cell>
                     <div className="flex items-center space-x-3">
-                      <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs flex items-center justify-center font-mono shrink-0 shadow-2xs border border-emerald-200">
-                        📍
+                      <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs border border-emerald-200">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
                       </div>
                       <div>
                         <p className="font-extrabold text-slate-900 text-xs">{b.name}</p>
@@ -303,8 +309,8 @@ const AreaBlocksPage = () => {
                   </Table.Cell>
 
                   <Table.Cell>
-                    <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
-                      🏢 {b.district || 'Khurda'}
+                    <span className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
+                      <span>{b.district || 'Khurda'}</span>
                     </span>
                   </Table.Cell>
 
@@ -323,14 +329,17 @@ const AreaBlocksPage = () => {
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleOpenEdit(b)}
-                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full border border-slate-200/80 transition"
+                          className="inline-flex items-center space-x-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full border border-slate-200/80 transition"
                         >
-                          ✏️ Edit
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span className='cursor-pointer'>Edit</span>
                         </button>
 
                         <button
                           onClick={() => handleToggleStatus(b)}
-                          className={`px-3 py-1 text-xs font-bold rounded-full transition border ${
+                          className={`cursor-pointer px-3 py-1 text-xs font-bold rounded-full transition border ${
                             b.is_active !== false
                               ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
                               : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
@@ -342,9 +351,12 @@ const AreaBlocksPage = () => {
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteBlock(b)}
-                            className="cursor-pointer px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-full border border-rose-200 transition"
+                            className="cursor-pointer inline-flex items-center space-x-1 px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-full border border-rose-200 transition"
                           >
-                            🗑️ Delete
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Delete</span>
                           </button>
                         )}
                       </div>

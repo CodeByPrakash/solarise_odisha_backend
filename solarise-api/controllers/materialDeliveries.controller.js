@@ -12,7 +12,7 @@ export const getDeliveryByProject = async (req, res) => {
                 md.dcr_number,
                 md.recorded_by,
                 u.first_name || ' ' || u.last_name AS recorded_by_name,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 p.current_status AS project_status
             FROM material_deliveries md
             JOIN projects p ON md.project_id = p.id

@@ -11,7 +11,7 @@ export const getAllProjects = async (req, res) => {
             SELECT 
                 p.id,
                 p.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 c.electric_consumer_no,
                 c.created_by AS consumer_created_by,
                 p.current_status,
@@ -127,7 +127,7 @@ export const getProjectsByStatus = async (req, res) => {
             SELECT 
                 p.id,
                 p.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 c.electric_consumer_no,
                 p.current_status,
                 p.registration_no,
@@ -157,7 +157,7 @@ export const getProjectById = async (req, res) => {
             SELECT 
                 p.id,
                 p.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 c.address AS consumer_address,
                 c.phone_primary AS consumer_phone,
                 c.electric_consumer_no,

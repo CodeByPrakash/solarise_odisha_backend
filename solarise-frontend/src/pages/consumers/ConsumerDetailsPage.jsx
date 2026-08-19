@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { consumerService, bankLoanService, documentService, projectService } from '../../services/api';
+import { consumerService, bankLoanService, documentService, projectService, userService, transferService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { WhatsAppShareButton } from '../../components/WhatsAppShareButton';
 
 const ConsumerDetailsPage = () => {
   const { id } = useParams();
@@ -19,6 +21,9 @@ const ConsumerDetailsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+
+  const { showSuccess, showError } = useToast();
 
   // Edit Consumer form state
   const [editForm, setEditForm] = useState({
@@ -57,6 +62,11 @@ const ConsumerDetailsPage = () => {
   const [savingLoan, setSavingLoan] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [activating, setActivating] = useState(false);
+
+  // Transfer form state
+  const [agents, setAgents] = useState([]);
+  const [transferForm, setTransferForm] = useState({ to_agent_id: '', remarks: '' });
+  const [transferring, setTransferring] = useState(false);
 
   // Authorization check for consumer activation & deactivation
   const canManageDeactivation = ['admin', 'doc_team'].includes(user?.role);
@@ -213,6 +223,47 @@ const ConsumerDetailsPage = () => {
     }
   };
 
+  const handleOpenTransferModal = async () => {
+    try {
+      setShowTransferModal(true);
+      const res = await userService.getAll();
+      const userList = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      // Exclude logged in user, current consumer owner, and inactive users
+      const loggedUserId = user?.id || user?.userId;
+      setAgents(
+        userList.filter(
+          (u) =>
+            String(u.id) !== String(loggedUserId) &&
+            String(u.id) !== String(consumer.created_by) &&
+            u.is_active !== false
+        )
+      );
+    } catch (err) {
+      showError('Failed to load users for transfer.');
+      setShowTransferModal(false);
+    }
+  };
+
+  const handleInitiateTransfer = async (e) => {
+    e.preventDefault();
+    if (!transferForm.to_agent_id) return;
+    try {
+      setTransferring(true);
+      await transferService.initiate({
+        consumer_id: id,
+        to_agent_id: transferForm.to_agent_id,
+        remarks: transferForm.remarks
+      });
+      showSuccess('Transfer request sent successfully! Awaiting acceptance.');
+      setShowTransferModal(false);
+      setTransferForm({ to_agent_id: '', remarks: '' });
+    } catch (err) {
+      showError(err.response?.data?.error || 'Failed to initiate transfer');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -243,7 +294,9 @@ const ConsumerDetailsPage = () => {
         <div className="p-6 bg-amber-50 rounded-[28px] border border-amber-200 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 rounded-[14px] bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xl shrink-0">
-              🔒
+              <svg className="w-5 h-5 text-amber-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-amber-950">Consumer Profile is Currently Deactivated</h3>
@@ -257,9 +310,12 @@ const ConsumerDetailsPage = () => {
             <button
               onClick={handleActivateConsumer}
               disabled={activating}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-2xs transition shrink-0 flex items-center space-x-1"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-2xs transition shrink-0 flex items-center space-x-1.5"
             >
-              <span>{activating ? 'Activating...' : '⚡ Activate Consumer Profile'}</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>{activating ? 'Activating...' : 'Activate Consumer Profile'}</span>
             </button>
           )}
         </div>
@@ -282,16 +338,49 @@ const ConsumerDetailsPage = () => {
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Electric Consumer No: <span className="font-mono font-bold text-slate-900">{consumer.electric_consumer_no}</span> | Primary Phone: <span className="font-bold text-slate-900">{consumer.phone_primary}</span>
+            {consumer.creator_first_name && (
+              <> | Belongs To:{' '}
+                <button
+                  onClick={() => navigate(`/users?search=${encodeURIComponent(consumer.creator_first_name)}`)}
+                  className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline transition"
+                >
+                  {consumer.creator_first_name} {consumer.creator_last_name} [{(consumer.creator_role || 'Agent').replace(/_/g, ' ').toUpperCase()}]
+                </button>
+              </>
+            )}
           </p>
         </div>
 
         <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-2">
+          <WhatsAppShareButton
+            consumerName={consumer.full_name}
+            phone={consumer.phone_primary}
+            projectCode={linkedProject ? `PROJ-${linkedProject.id}` : 'SOLARISE'}
+            statusName={linkedProject?.current_status || 'Registered'}
+            capacityKw={linkedProject?.capacity_kw || 3}
+          />
           <button
             onClick={() => setShowEditModal(true)}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition border border-slate-200"
+            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition border border-slate-200"
           >
-            ✏️ Edit Profile
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Edit Profile</span>
           </button>
+
+          {/* Transfer Action (Strictly visible ONLY to the owner user) */}
+          {String(user?.id || user?.userId) === String(consumer.created_by) && (
+            <button
+              onClick={handleOpenTransferModal}
+              className="inline-flex items-center space-x-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full transition border border-indigo-200"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span>Transfer</span>
+            </button>
+          )}
 
           {/* Deactivate / Activate Actions restricted to admin & doc_team */}
           {canManageDeactivation && (
@@ -299,16 +388,22 @@ const ConsumerDetailsPage = () => {
               <button
                 onClick={handleActivateConsumer}
                 disabled={activating}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full transition shadow-2xs"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full transition shadow-2xs"
               >
-                {activating ? 'Activating...' : '⚡ Activate Consumer'}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>{activating ? 'Activating...' : 'Activate Consumer'}</span>
               </button>
             ) : (
               <button
                 onClick={() => setShowDeactivateModal(true)}
-                className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-full transition border border-amber-300"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-full transition border border-amber-300"
               >
-                🚫 Deactivate
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <span>Deactivate</span>
               </button>
             )
           )}
@@ -326,7 +421,9 @@ const ConsumerDetailsPage = () => {
       <div className="bg-white p-6 rounded-[28px] shadow-sm border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
           <div className="h-10 w-10 rounded-[14px] bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-bold text-lg shadow-2xs">
-            ☀️
+            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
           </div>
           <div>
             <h3 className="text-sm font-extrabold text-slate-900">Linked Solar Installation Project</h3>
@@ -362,13 +459,32 @@ const ConsumerDetailsPage = () => {
         {/* Personal & Contact Person Details Card */}
         <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-6">
           <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-3">
-            <span>👤 Consumer Personal & Contact Credentials</span>
+            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>Consumer Personal & Contact Credentials</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <span className="text-slate-400 font-bold block">Full Name</span>
               <span className="text-slate-900 font-extrabold text-sm">{consumer.full_name}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 font-bold block">Assigned / Belongs To User</span>
+              {consumer.creator_first_name ? (
+                <button
+                  onClick={() => navigate(`/users?search=${encodeURIComponent(consumer.creator_first_name)}`)}
+                  className="text-indigo-600 hover:text-indigo-800 hover:underline font-extrabold flex items-center space-x-1 mt-0.5"
+                >
+                  <span>{consumer.creator_first_name} {consumer.creator_last_name} [{(consumer.creator_role || 'Agent').replace(/_/g, ' ').toUpperCase()}]</span>
+                  <svg className="w-3.5 h-3.5 inline text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              ) : (
+                <span className="text-slate-500 font-semibold">Unassigned</span>
+              )}
             </div>
             <div>
               <span className="text-slate-400 font-bold block">Primary Phone</span>
@@ -486,7 +602,10 @@ const ConsumerDetailsPage = () => {
       {/* Uploaded Documents Grid */}
       <div className="bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-4">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-3">
-          <span>📄 Uploaded Verification Documents ({documents.length})</span>
+          <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>Uploaded Verification Documents ({documents.length})</span>
         </h2>
 
         {documents.length === 0 ? (
@@ -703,6 +822,71 @@ const ConsumerDetailsPage = () => {
                 {deactivating ? 'Deactivating...' : 'Confirm Deactivation'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Consumer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900 flex items-center space-x-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span>Transfer Consumer Ownership</span>
+            </h3>
+            
+            <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-xs text-indigo-800 mb-2">
+              Transferring <span className="font-bold">{consumer.full_name}</span> to another agent requires their acceptance.
+            </div>
+
+            <form onSubmit={handleInitiateTransfer} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Select Destination User *</label>
+                <select
+                  value={transferForm.to_agent_id}
+                  onChange={(e) => setTransferForm({ ...transferForm, to_agent_id: e.target.value })}
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-white"
+                >
+                  <option value="">-- Choose User / Role --</option>
+                  {agents.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} {u.last_name} [{ (u.role || '').replace(/_/g, ' ').toUpperCase() }] ({u.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Transfer Remarks (Optional)</label>
+                <textarea
+                  value={transferForm.remarks}
+                  onChange={(e) => setTransferForm({ ...transferForm, remarks: e.target.value })}
+                  placeholder="Reason for transfer or notes for the receiving agent..."
+                  rows={2}
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-full"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={transferring || !transferForm.to_agent_id}
+                  className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-full hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {transferring ? 'Sending Request...' : 'Initiate Transfer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

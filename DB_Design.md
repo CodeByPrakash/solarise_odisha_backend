@@ -457,7 +457,8 @@ CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'refunded', 'failed');
 ```sql
 CREATE TABLE users (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  full_name     TEXT NOT NULL,
+  first_name    TEXT NOT NULL,
+  last_name     TEXT NOT NULL,
   email         CITEXT UNIQUE NOT NULL,
   phone         VARCHAR(15) UNIQUE NOT NULL,
   role          user_role NOT NULL DEFAULT 'agent',

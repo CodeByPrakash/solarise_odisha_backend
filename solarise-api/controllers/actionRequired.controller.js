@@ -19,12 +19,10 @@ export const getAllOpenActions = async (req, res) => {
                 ar.resolved_by,
                 u3.first_name || ' ' || u3.last_name AS resolved_by_name,
                 ar.resolved_at,
-                c.full_name AS consumer_name,
                 p.consumer_id,
                 p.current_status AS project_status
             FROM action_required ar
             JOIN projects p ON ar.project_id = p.id
-            JOIN consumers c ON p.consumer_id = c.id
             LEFT JOIN users u1 ON ar.raised_by = u1.id
             LEFT JOIN users u2 ON ar.assigned_to = u2.id
             LEFT JOIN users u3 ON ar.resolved_by = u3.id
@@ -246,7 +244,7 @@ export const getOverdueActions = async (req, res) => {
                 ar.raised_at,
                 ar.assigned_to,
                 u2.first_name || ' ' || u2.last_name AS assigned_to_name,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 p.current_status AS project_status,
                 EXTRACT(DAY FROM NOW() - ar.raised_at)::INTEGER AS days_open
             FROM action_required ar

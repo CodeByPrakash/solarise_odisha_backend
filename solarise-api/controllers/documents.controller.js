@@ -10,7 +10,7 @@ export const getAllDocuments = async (req, res) => {
             SELECT 
                 d.id,
                 d.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 d.doc_type,
                 d.file_url,
                 d.file_name,
@@ -56,7 +56,7 @@ export const getDocumentById = async (req, res) => {
             SELECT 
                 d.id,
                 d.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 d.doc_type,
                 d.file_url,
                 d.file_name,

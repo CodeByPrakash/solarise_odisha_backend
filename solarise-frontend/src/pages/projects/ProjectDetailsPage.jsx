@@ -12,6 +12,7 @@ import {
 import api from '../../services/api';
 import StatusTag from '../../components/tags/StatusTag';
 import HashtagTagInput from '../../components/tags/HashtagTagInput';
+import { WhatsAppShareButton } from '../../components/WhatsAppShareButton';
 
 // Helper status color badge mapping for all 44+ project status tags
 export const getStatusTagBadge = (status) => {
@@ -418,7 +419,14 @@ const ProjectDetailsPage = () => {
             Consumer ID: <span className="font-mono font-semibold text-gray-700">{project.consumer_id}</span> | Capacity: <span className="font-semibold text-emerald-600">{project.capacity_kw} kW</span>
           </p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center space-x-3">
+        <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-3">
+          <WhatsAppShareButton
+            consumerName={project.consumer_name || project.full_name}
+            phone={project.phone_primary || project.phone}
+            projectCode={`PROJ-${project.id}`}
+            statusName={project.current_status}
+            capacityKw={project.capacity_kw}
+          />
           <button
             onClick={() => setShowActionModal(true)}
             className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold rounded-xl hover:bg-amber-100 transition"

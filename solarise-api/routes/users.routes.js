@@ -41,7 +41,9 @@ const router = Router();
  *                     properties:
  *                       id:
  *                         type: integer
- *                       full_name:
+ *                       first_name:
+ *                         type: string
+ *                       last_name:
  *                         type: string
  *                       email:
  *                         type: string
@@ -71,11 +73,14 @@ router.get("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'site_man
  *         application/json:
  *           schema:
  *             type: object
- *             required: [full_name, email, phone, password_hash]
+ *             required: [first_name, last_name, email, phone, password]
  *             properties:
- *               full_name:
+ *               first_name:
  *                 type: string
- *                 example: "Ravi Patel"
+ *                 example: "Ravi"
+ *               last_name:
+ *                 type: string
+ *                 example: "Patel"
  *               email:
  *                 type: string
  *                 example: "ravi@example.com"
@@ -86,9 +91,9 @@ router.get("/:id", authenticateToken, authorizeRoles('admin', 'agent', 'site_man
  *                 type: string
  *                 enum: [admin, agent, site_manager, doc_team, accounts]
  *                 example: "agent"
- *               password_hash:
+ *               password:
  *                 type: string
- *                 example: "hashedPassword123"
+ *                 example: "StrongPass123"
  *     responses:
  *       201:
  *         description: User created
@@ -118,7 +123,9 @@ router.post("/", authenticateToken, authorizeRoles('admin', 'doc_team', 'site_ma
  *           schema:
  *             type: object
  *             properties:
- *               full_name:
+ *               first_name:
+ *                 type: string
+ *               last_name:
  *                 type: string
  *               email:
  *                 type: string

@@ -201,7 +201,10 @@ const ConsumersPage = () => {
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
           >
-            <span>👤 Active Consumers ({activeCount})</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>Active Consumers ({activeCount})</span>
           </button>
 
           <button
@@ -211,7 +214,10 @@ const ConsumersPage = () => {
                 : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200/80'
               }`}
           >
-            <span>🔒 Deactivated Consumers ({deactivatedCount})</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span>Deactivated Consumers ({deactivatedCount})</span>
             {deactivatedCount > 0 && (
               <span className="px-2 py-0.5 bg-amber-200 text-amber-950 text-[10px] font-bold rounded-full">
                 {deactivatedCount}
@@ -248,8 +254,10 @@ const ConsumersPage = () => {
             placeholder={activeTab === 'deactivated' ? "Search deactivated records..." : "Search active consumers by name, phone, or electric consumer no..."}
             className="w-full pl-9 pr-4 py-2.5 rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
           />
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-            🔍
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
 
@@ -313,6 +321,7 @@ const ConsumersPage = () => {
             <Table.Header>
               <Table.HeaderCell>Full Name & Phone</Table.HeaderCell>
               <Table.HeaderCell>Electric Consumer No.</Table.HeaderCell>
+              <Table.HeaderCell>Assigned Owner</Table.HeaderCell>
               <Table.HeaderCell>Address</Table.HeaderCell>
               <Table.HeaderCell>MAC Rule Evaluation</Table.HeaderCell>
               <Table.HeaderCell>Payment Mode</Table.HeaderCell>
@@ -324,10 +333,14 @@ const ConsumersPage = () => {
                 const isSurpassedMAC = age > 64;
                 const isDeactivated = isConsumerDeactivated(c);
                 return (
-                  <Table.Row key={c.id} className={isDeactivated ? 'bg-amber-50/40 hover:bg-amber-50/60 transition' : ''}>
+                  <Table.Row
+                    key={c.id}
+                    onClick={() => navigate(`/consumers/${c.id}`)}
+                    className={`cursor-pointer hover:bg-slate-100/70 transition-colors border-b border-slate-200/90 ${isDeactivated ? 'bg-amber-50/40 hover:bg-amber-100/60' : ''}`}
+                  >
                     <Table.Cell>
-                      <div className="font-extrabold text-slate-900 text-xs flex items-center space-x-2">
-                        <span>{c.full_name}</span>
+                      <div className="font-extrabold text-slate-900 text-xs flex items-center space-x-2 group-hover:text-emerald-700">
+                        <span className="hover:underline font-extrabold text-slate-900">{c.full_name}</span>
                         {isDeactivated && (
                           <span className="px-2 py-0.5 text-[9px] font-extrabold bg-amber-200/80 text-amber-950 rounded-full border border-amber-300 font-mono">
                             Deactivated
@@ -339,6 +352,22 @@ const ConsumersPage = () => {
 
                     <Table.Cell>
                       <span className="font-mono font-extrabold text-slate-900 text-xs">{c.electric_consumer_no || 'N/A'}</span>
+                    </Table.Cell>
+
+                    <Table.Cell>
+                      {c.creator_first_name ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/users?search=${encodeURIComponent(c.creator_first_name)}`);
+                          }}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center space-x-1"
+                        >
+                          <span>{c.creator_first_name} {c.creator_last_name}</span>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Unassigned</span>
+                      )}
                     </Table.Cell>
 
                     <Table.Cell>
@@ -367,15 +396,6 @@ const ConsumersPage = () => {
 
                     <Table.Cell>
                       <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/consumers/${c.id}`)}
-                          className="text-xs font-bold rounded-full border-slate-200 hover:bg-slate-50 text-slate-700"
-                        >
-                          View Profile
-                        </Button>
-
                         {/* ACTIVATE / DEACTIVATE BUTTONS FOR ADMIN / DOC_TEAM */}
                         {canManageDeactivation && (
                           isDeactivated ? (
@@ -384,15 +404,21 @@ const ConsumersPage = () => {
                               disabled={actionLoadingId === c.id}
                               className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-2xs transition flex items-center space-x-1"
                             >
-                              <span>{actionLoadingId === c.id ? 'Activating...' : '⚡ Activate'}</span>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              <span>{actionLoadingId === c.id ? 'Activating...' : 'Activate'}</span>
                             </button>
                           ) : (
                             <button
                               onClick={(e) => handleDeactivateConsumer(e, c.id)}
                               disabled={actionLoadingId === c.id}
-                              className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-full border border-amber-300 transition"
+                              className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-full border border-amber-300 transition flex items-center space-x-1"
                             >
-                              {actionLoadingId === c.id ? 'Deactivating...' : '🚫 Deactivate'}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              <span>{actionLoadingId === c.id ? 'Deactivating...' : 'Deactivate'}</span>
                             </button>
                           )
                         )}

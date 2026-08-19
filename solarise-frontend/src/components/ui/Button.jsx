@@ -29,7 +29,7 @@ export const Button = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${variantStyles[variant] || variantStyles.primary} ${sizeStyles[size] || sizeStyles.md} rounded-lg font-medium transition-all ${className}`}
+      className={`${variantStyles[variant] || variantStyles.primary} ${sizeStyles[size] || sizeStyles.md} rounded-lg font-medium transition-all cursor-pointer ${className}`}
     >
       {children}
     </button>

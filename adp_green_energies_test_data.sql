@@ -125,6 +125,23 @@ CREATE TABLE IF NOT EXISTS consumers (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS consumer_transfers (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    consumer_id BIGINT NOT NULL REFERENCES consumers(id) ON DELETE CASCADE,
+    from_agent_id BIGINT NOT NULL REFERENCES users(id),
+    to_agent_id BIGINT NOT NULL REFERENCES users(id),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'accepted', 'rejected')),
+    remarks TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_consumer_transfer_agents CHECK (from_agent_id <> to_agent_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_consumer_transfers_pending
+    ON consumer_transfers (consumer_id)
+    WHERE status = 'pending';
+
 CREATE TABLE IF NOT EXISTS bank_loans (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     consumer_id BIGINT NOT NULL UNIQUE REFERENCES consumers(id) ON DELETE CASCADE,
@@ -258,17 +275,17 @@ CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(user_id) WHERE NOT 
 -- ============================================================
 
 -- 4.1 USERS
-INSERT INTO users (full_name, email, phone, role, password_hash, is_active, created_at) VALUES
-('Rajesh Sharma', 'rajesh.sharma@adpgreen.com', '+919876543210', 'admin', '$2b$12$hashedpassword1', TRUE, '2026-01-15 09:00:00+05:30'),
-('Priya Patel', 'priya.patel@adpgreen.com', '+919876543211', 'agent', '$2b$12$hashedpassword2', TRUE, '2026-01-20 10:30:00+05:30'),
-('Amit Kumar', 'amit.kumar@adpgreen.com', '+919876543212', 'agent', '$2b$12$hashedpassword3', TRUE, '2026-02-01 11:00:00+05:30'),
-('Sneha Gupta', 'sneha.gupta@adpgreen.com', '+919876543213', 'doc_team', '$2b$12$hashedpassword4', TRUE, '2026-01-25 14:00:00+05:30'),
-('Vikram Rao', 'vikram.rao@adpgreen.com', '+919876543214', 'site_manager', '$2b$12$hashedpassword5', TRUE, '2026-02-10 09:00:00+05:30'),
-('Anita Desai', 'anita.desai@adpgreen.com', '+919876543215', 'accounts', '$2b$12$hashedpassword6', TRUE, '2026-02-05 10:00:00+05:30'),
-('Rahul Verma', 'rahul.verma@adpgreen.com', '+919876543216', 'agent', '$2b$12$hashedpassword7', TRUE, '2026-03-01 08:30:00+05:30'),
-('Meena Joshi', 'meena.joshi@adpgreen.com', '+919876543217', 'doc_team', '$2b$12$hashedpassword8', TRUE, '2026-03-10 11:30:00+05:30'),
-('Sunil Nair', 'sunil.nair@adpgreen.com', '+919876543218', 'site_manager', '$2b$12$hashedpassword9', TRUE, '2026-03-15 09:00:00+05:30'),
-('Deepa Reddy', 'deepa.reddy@adpgreen.com', '+919876543219', 'agent', '$2b$12$hashedpassword10', TRUE, '2026-04-01 10:00:00+05:30');
+INSERT INTO users (first_name, last_name, email, phone, role, password_hash, is_active, created_at) VALUES
+('Rajesh', 'Sharma', 'rajesh.sharma@adpgreen.com', '+919876543210', 'admin', '$2b$12$hashedpassword1', TRUE, '2026-01-15 09:00:00+05:30'),
+('Priya', 'Patel', 'priya.patel@adpgreen.com', '+919876543211', 'agent', '$2b$12$hashedpassword2', TRUE, '2026-01-20 10:30:00+05:30'),
+('Amit', 'Kumar', 'amit.kumar@adpgreen.com', '+919876543212', 'agent', '$2b$12$hashedpassword3', TRUE, '2026-02-01 11:00:00+05:30'),
+('Sneha', 'Gupta', 'sneha.gupta@adpgreen.com', '+919876543213', 'doc_team', '$2b$12$hashedpassword4', TRUE, '2026-01-25 14:00:00+05:30'),
+('Vikram', 'Rao', 'vikram.rao@adpgreen.com', '+919876543214', 'site_manager', '$2b$12$hashedpassword5', TRUE, '2026-02-10 09:00:00+05:30'),
+('Anita', 'Desai', 'anita.desai@adpgreen.com', '+919876543215', 'accounts', '$2b$12$hashedpassword6', TRUE, '2026-02-05 10:00:00+05:30'),
+('Rahul', 'Verma', 'rahul.verma@adpgreen.com', '+919876543216', 'agent', '$2b$12$hashedpassword7', TRUE, '2026-03-01 08:30:00+05:30'),
+('Meena', 'Joshi', 'meena.joshi@adpgreen.com', '+919876543217', 'doc_team', '$2b$12$hashedpassword8', TRUE, '2026-03-10 11:30:00+05:30'),
+('Sunil', 'Nair', 'sunil.nair@adpgreen.com', '+919876543218', 'site_manager', '$2b$12$hashedpassword9', TRUE, '2026-03-15 09:00:00+05:30'),
+('Deepa', 'Reddy', 'deepa.reddy@adpgreen.com', '+919876543219', 'agent', '$2b$12$hashedpassword10', TRUE, '2026-04-01 10:00:00+05:30');
 
 -- 4.2 AREA BLOCKS
 INSERT INTO area_blocks (name, is_active) VALUES

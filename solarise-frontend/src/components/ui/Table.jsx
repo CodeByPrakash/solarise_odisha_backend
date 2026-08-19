@@ -32,8 +32,8 @@ Table.Body = ({ children }) => {
   return <tbody className="divide-y divide-gray-200">{children}</tbody>;
 };
 
-Table.Row = ({ children }) => {
-  return <tr>{children}</tr>;
+Table.Row = ({ children, className = '', onClick }) => {
+  return <tr className={className} onClick={onClick}>{children}</tr>;
 };
 
 Table.Cell = ({ children, className = '' }) => {

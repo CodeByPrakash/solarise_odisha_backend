@@ -7,7 +7,7 @@ export const getAllBankLoans = async (req, res) => {
             SELECT 
                 bl.id,
                 bl.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 c.phone_primary AS consumer_phone,
                 c.payment_mode,
                 bl.is_ghanbani_land,
@@ -34,7 +34,7 @@ export const getBankLoanByConsumer = async (req, res) => {
             SELECT 
                 bl.id,
                 bl.consumer_id,
-                c.full_name AS consumer_name,
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name,
                 c.payment_mode,
                 bl.is_ghanbani_land,
                 bl.bank_name,
@@ -48,7 +48,7 @@ export const getBankLoanByConsumer = async (req, res) => {
             WHERE bl.consumer_id = $1
         `, [consumerId]);
         if (result.rowCount === 0) {
-            return res.status(404).json({ error: "No bank loan found for this consumer" });
+            return res.status(200).json({ data: null, message: "No bank loan record found for this consumer" });
         }
         res.status(200).json({ data: result.rows[0] });
     } catch (err) {
@@ -64,7 +64,7 @@ export const createBankLoan = async (req, res) => {
         }
         // BUSINESS RULE: Verify consumer's payment_mode = 'bank_loan'
         const consumerCheck = await pool.query(
-            "SELECT id, full_name, payment_mode FROM consumers WHERE id = $1",
+            "SELECT id, first_name, last_name, payment_mode FROM consumers WHERE id = $1",
             [consumer_id]
         );
         if (consumerCheck.rowCount === 0) {

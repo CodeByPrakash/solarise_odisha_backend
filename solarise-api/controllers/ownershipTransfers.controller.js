@@ -15,7 +15,7 @@ export const getTransferByActionId = async (req, res) => {
                 ar.action_type,
                 ar.status AS action_status,
                 ar.detail AS action_detail,
-                c.full_name AS consumer_name
+                COALESCE(c.first_name, '') || ' ' || COALESCE(c.last_name, '') AS consumer_name
             FROM ownership_transfers ot
             JOIN action_required ar ON ot.action_id = ar.id
             JOIN projects p ON ar.project_id = p.id

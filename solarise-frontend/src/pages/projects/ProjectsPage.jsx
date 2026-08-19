@@ -181,11 +181,15 @@ const ProjectsPage = () => {
             </Table.Header>
             <Table.Body>
               {filteredProjects.map((project) => (
-                <Table.Row key={project.id}>
-                  <Table.Cell className="font-semibold text-gray-900">
+                <Table.Row
+                  key={project.id}
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                  className="cursor-pointer hover:bg-emerald-50/60 transition-colors group"
+                >
+                  <Table.Cell className="font-extrabold text-slate-900 text-xs">
                     {project.registration_no || `PROJ-${project.id}`}
                   </Table.Cell>
-                  <Table.Cell className="font-medium text-gray-800">
+                  <Table.Cell className="font-medium text-slate-800 text-xs">
                     {project.consumer_name || `Consumer #${project.consumer_id}`}
                   </Table.Cell>
                   <Table.Cell className="font-mono text-xs font-semibold text-emerald-700">
@@ -197,17 +201,16 @@ const ProjectsPage = () => {
                       onClick={(t) => setSearchTerm(`#${t}`)}
                     />
                   </Table.Cell>
-                  <Table.Cell className="text-xs text-gray-500 font-mono">
+                  <Table.Cell className="text-xs text-slate-500 font-mono">
                     {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A'}
                   </Table.Cell>
                   <Table.Cell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}`)}
-                    >
-                      View Pipeline
-                    </Button>
+                    <div className="flex items-center space-x-1 text-xs font-bold text-emerald-600 group-hover:text-emerald-700 transition">
+                      <span>View Pipeline</span>
+                      <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </Table.Cell>
                 </Table.Row>
               ))}

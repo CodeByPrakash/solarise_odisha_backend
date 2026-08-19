@@ -79,7 +79,12 @@ export const StatusTag = ({ status, onClick, showHashtag = true, size = 'md' }) 
 
   return (
     <span
-      onClick={() => onClick && onClick(rawStatus)}
+      onClick={(e) => {
+        if (onClick) {
+          e.stopPropagation();
+          onClick(rawStatus);
+        }
+      }}
       className={`inline-flex items-center space-x-1 font-semibold rounded-full border transition cursor-pointer font-mono ${sizeClasses} ${colorClass}`}
     >
       {showHashtag && <span className="opacity-60 font-bold">#</span>}
