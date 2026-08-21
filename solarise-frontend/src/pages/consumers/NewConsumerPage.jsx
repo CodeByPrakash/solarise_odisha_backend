@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { consumerService, areaBlockService } from '../../services/api';
 import { validateMobile, validateEmail, validatePAN, validateAadhaar } from '../../utils/validators';
+import { useToast } from '../../context/ToastContext';
 
 const NewConsumerPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [areaBlocks, setAreaBlocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [geoLocating, setGeoLocating] = useState(false);
+  const [geoAccuracy, setGeoAccuracy] = useState(null);
 
   const [form, setForm] = useState({
     full_name: '',
@@ -78,25 +81,62 @@ const NewConsumerPage = () => {
 
   const handleFetchLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      if (toast?.showError) {
+        toast.showError('Geolocation is not supported by your browser.', 'GPS Unavailable');
+      } else {
+        alert('Geolocation is not supported by your browser.');
+      }
       return;
     }
     setGeoLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy);
+
         setForm((prev) => ({
           ...prev,
-          geo_lat: position.coords.latitude.toFixed(6),
-          geo_lng: position.coords.longitude.toFixed(6),
+          geo_lat: lat,
+          geo_lng: lng,
         }));
+        setGeoAccuracy(accuracy);
         setGeoLocating(false);
+        if (toast?.showSuccess) {
+          toast.showSuccess(`GPS coordinates captured (Accuracy: ±${accuracy}m)`, 'Location Detected');
+        }
       },
       (err) => {
         console.error('Error fetching GPS coordinates:', err);
-        alert('Could not fetch location. Please enter coordinates manually.');
+        let errorMsg = 'Could not fetch location. Please enter coordinates manually.';
+        if (err.code === 1) {
+          errorMsg = 'Location permission was denied. Please allow location access in your browser.';
+        } else if (err.code === 2) {
+          errorMsg = 'Location unavailable. Please ensure GPS / location service is enabled.';
+        } else if (err.code === 3) {
+          errorMsg = 'GPS location request timed out. Please try again.';
+        }
+        if (toast?.showError) {
+          toast.showError(errorMsg, 'GPS Error');
+        } else {
+          alert(errorMsg);
+        }
         setGeoLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
       }
     );
+  };
+
+  const handleClearLocation = () => {
+    setForm((prev) => ({ ...prev, geo_lat: '', geo_lng: '' }));
+    setGeoAccuracy(null);
+    if (toast?.showInfo) {
+      toast.showInfo('GPS coordinates cleared', 'Notice');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -191,7 +231,7 @@ const NewConsumerPage = () => {
       )}
 
       <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-6">
-        
+
         {/* Personal Details */}
         <div className="space-y-4">
           <h2 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5 font-mono flex items-center space-x-2">
@@ -429,39 +469,128 @@ const NewConsumerPage = () => {
               />
             </div>
 
-            {/* Geo Coordinates */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold text-slate-700">Latitude (Lat)</label>
-                <button
-                  type="button"
-                  onClick={handleFetchLocation}
-                  disabled={geoLocating}
-                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline"
-                >
-                  {geoLocating ? 'Detecting GPS...' : '📍 Auto-detect GPS'}
-                </button>
-              </div>
-              <input
-                type="text"
-                name="geo_lat"
-                value={form.geo_lat}
-                onChange={handleChange}
-                placeholder="e.g. 20.296059"
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-mono"
-              />
-            </div>
+            {/* Site Geolocation Section */}
+            <div className="md:col-span-2 bg-linear-to-r from-emerald-50/70 via-teal-50/40 to-slate-50 border border-emerald-100/90 rounded-2xl p-4 shadow-2xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                      <span>Site GPS Geotagging</span>
+                      {form.geo_lat && form.geo_lng && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                          ✓ Synced {geoAccuracy ? `(±${geoAccuracy}m)` : ''}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Auto-detect rooftop solar coordinates or enter manually</p>
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Longitude (Lng)</label>
-              <input
-                type="text"
-                name="geo_lng"
-                value={form.geo_lng}
-                onChange={handleChange}
-                placeholder="e.g. 85.824539"
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-mono"
-              />
+                {/* Action Buttons Group */}
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  {form.geo_lat && form.geo_lng && (
+                    <>
+                      <a
+                        href={`https://www.google.com/maps?q=${form.geo_lat},${form.geo_lng}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition active:scale-95"
+                        title="Preview pin on Google Maps"
+                      >
+                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span>View Map</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleClearLocation}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-rose-600 px-2 py-1.5 rounded-xl hover:bg-rose-50 transition"
+                        title="Clear coordinates"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleFetchLocation}
+                    disabled={geoLocating}
+                    className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 shadow-xs active:scale-95 cursor-pointer disabled:cursor-not-allowed ${geoLocating
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 ring-2 ring-emerald-400/30'
+                        : form.geo_lat && form.geo_lng
+                          ? 'bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 hover:border-emerald-400 hover:shadow-emerald-500/10'
+                          : 'bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/25 hover:shadow-emerald-600/35 hover:-translate-y-0.5'
+                      }`}
+                  >
+                    {geoLocating ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span className="animate-pulse">Acquiring GPS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className={`w-3.5 h-3.5 shrink-0 ${form.geo_lat && form.geo_lng ? 'text-emerald-600' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>{form.geo_lat && form.geo_lng ? 'Re-detect GPS' : 'Auto-detect GPS'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Coordinates Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Latitude (Lat)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[10px] font-mono font-bold text-slate-400">
+                      LAT
+                    </span>
+                    <input
+                      type="text"
+                      name="geo_lat"
+                      value={form.geo_lat}
+                      onChange={handleChange}
+                      placeholder="e.g. 20.296059"
+                      className="w-full pl-11 pr-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-mono font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Longitude (Lng)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[10px] font-mono font-bold text-slate-400">
+                      LNG
+                    </span>
+                    <input
+                      type="text"
+                      name="geo_lng"
+                      value={form.geo_lng}
+                      onChange={handleChange}
+                      placeholder="e.g. 85.824539"
+                      className="w-full pl-11 pr-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-mono font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
