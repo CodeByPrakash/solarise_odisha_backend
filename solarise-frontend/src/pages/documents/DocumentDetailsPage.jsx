@@ -21,7 +21,10 @@ const DocumentDetailsPage = () => {
 
   // Reupload modal state
   const [showReuploadModal, setShowReuploadModal] = useState(false);
+  const [reuploadFile, setReuploadFile] = useState(null);
   const [reuploadUrl, setReuploadUrl] = useState('');
+  const [reuploadFileName, setReuploadFileName] = useState('');
+  const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'url'
   const [reuploading, setReuploading] = useState(false);
 
   // Flag document state
@@ -85,13 +88,36 @@ const DocumentDetailsPage = () => {
   const handleReupload = async (e) => {
     e.preventDefault();
     try {
+      if (uploadMode === 'file' && !reuploadFile) {
+        alert('Please choose a file to upload to S3.');
+        return;
+      }
+      if (uploadMode === 'url' && !reuploadUrl) {
+        alert('Please enter a valid file URL.');
+        return;
+      }
+
       setReuploading(true);
-      await documentService.reupload(id, {
-        file_url: reuploadUrl || `https://storage.solarise.odisha.gov.in/docs/reupload_v2_${Date.now()}.jpg`,
-        uploaded_by: user?.id || 1,
-      });
+
+      let payload;
+      if (uploadMode === 'file' && reuploadFile) {
+        payload = new FormData();
+        payload.append('file', reuploadFile);
+        payload.append('uploaded_by', user?.id || 1);
+        if (reuploadFileName) payload.append('file_name', reuploadFileName);
+      } else {
+        payload = {
+          file_url: reuploadUrl,
+          file_name: reuploadFileName || undefined,
+          uploaded_by: user?.id || 1,
+        };
+      }
+
+      await documentService.reupload(id, payload);
       setShowReuploadModal(false);
+      setReuploadFile(null);
       setReuploadUrl('');
+      setReuploadFileName('');
       await fetchDocumentDetails();
     } catch (err) {
       alert(err.response?.data?.error || 'Reupload failed');
@@ -138,6 +164,10 @@ const DocumentDetailsPage = () => {
       </div>
     );
   }
+
+  const fileUrl = document.download_url || document.file_url;
+  const isImage = (document.mime_type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(document.file_url || ''));
+  const isPdf = (document.mime_type === 'application/pdf' || /\.pdf$/i.test(document.file_url || ''));
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
@@ -199,7 +229,10 @@ const DocumentDetailsPage = () => {
             </button>
           )}
           <button
-            onClick={() => setShowReuploadModal(true)}
+            onClick={() => {
+              setUploadMode('file');
+              setShowReuploadModal(true);
+            }}
             className="px-4 py-2 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold rounded-xl hover:bg-purple-100 transition"
           >
             + Upload New Version
@@ -256,16 +289,24 @@ const DocumentDetailsPage = () => {
             </div>
           )}
 
-          <div className="pt-2">
-            <span className="text-xs font-semibold text-gray-500 block mb-1">File Storage URL</span>
-            <a
-              href={document.file_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-mono text-blue-600 hover:underline break-all"
-            >
-              {document.file_url}
-            </a>
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-100">
+            <div>
+              <span className="text-xs font-semibold text-gray-500 block">S3 File Storage</span>
+              <span className="text-xs font-mono text-gray-700 break-all">{document.file_name || 'Stored Document'}</span>
+            </div>
+            {fileUrl && (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold rounded-xl transition self-start sm:self-auto shadow-xs"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                <span>Open in S3 / Download</span>
+              </a>
+            )}
           </div>
         </div>
 
@@ -302,6 +343,60 @@ const DocumentDetailsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Document Visual Preview */}
+      {fileUrl && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>Document File Preview</span>
+            </h2>
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+            >
+              Open Full Screen ↗
+            </a>
+          </div>
+
+          <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 min-h-[260px] flex items-center justify-center p-4">
+            {isImage ? (
+              <img
+                src={fileUrl}
+                alt={document.file_name || 'Document'}
+                className="max-h-[500px] w-auto max-w-full object-contain rounded-lg shadow-sm"
+              />
+            ) : isPdf ? (
+              <iframe
+                src={fileUrl}
+                title={document.file_name || 'PDF Document'}
+                className="w-full h-[550px] rounded-lg border-0"
+              />
+            ) : (
+              <div className="text-center py-10 space-y-2">
+                <svg className="w-12 h-12 text-slate-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <p className="text-xs font-semibold text-slate-700">{document.file_name || 'Document Attachment'}</p>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition"
+                >
+                  Download / View Attachment
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal: Reject Reason */}
       {showRejectModal && (
@@ -346,17 +441,65 @@ const DocumentDetailsPage = () => {
       {showReuploadModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-purple-900">Upload New Version</h3>
+            <h3 className="text-lg font-bold text-purple-900">Upload New Document Version</h3>
+
+            {/* Mode Switcher */}
+            <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setUploadMode('file')}
+                className={`flex-1 py-1.5 rounded-lg transition ${uploadMode === 'file' ? 'bg-white text-purple-900 shadow-xs' : 'text-gray-500'}`}
+              >
+                Upload File (AWS S3)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadMode('url')}
+                className={`flex-1 py-1.5 rounded-lg transition ${uploadMode === 'url' ? 'bg-white text-purple-900 shadow-xs' : 'text-gray-500'}`}
+              >
+                External URL
+              </button>
+            </div>
+
             <form onSubmit={handleReupload} className="space-y-3">
+              {uploadMode === 'file' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Select File to Upload *</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4"
+                    required
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setReuploadFile(f);
+                      if (f && !reuploadFileName) setReuploadFileName(f.name);
+                    }}
+                    className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-gray-200 rounded-xl p-2 cursor-pointer"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Directly uploaded to AWS S3 storage.</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">New File URL / Storage Path *</label>
+                  <input
+                    type="text"
+                    value={reuploadUrl}
+                    onChange={(e) => setReuploadUrl(e.target.value)}
+                    required
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 rounded-xl border text-xs font-mono"
+                  />
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">New File URL / Storage Path *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Custom File Name (Optional)</label>
                 <input
                   type="text"
-                  value={reuploadUrl}
-                  onChange={(e) => setReuploadUrl(e.target.value)}
-                  required
-                  placeholder="https://storage.solarise.odisha.gov.in/docs/reupload_v2.jpg"
-                  className="w-full px-3 py-2 rounded-xl border text-xs font-mono"
+                  value={reuploadFileName}
+                  onChange={(e) => setReuploadFileName(e.target.value)}
+                  placeholder="e.g. updated_electric_bill.pdf"
+                  className="w-full px-3 py-2 rounded-xl border text-xs"
                 />
               </div>
 
@@ -373,7 +516,7 @@ const DocumentDetailsPage = () => {
                   disabled={reuploading}
                   className="px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50"
                 >
-                  {reuploading ? 'Uploading...' : 'Re-upload Document'}
+                  {reuploading ? 'Uploading to S3...' : 'Re-upload Document'}
                 </button>
               </div>
             </form>

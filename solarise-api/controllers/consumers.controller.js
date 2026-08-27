@@ -1,6 +1,23 @@
 import pool from "../config/db.js";
 import { validateMobile, validateEmail, validatePAN, validateAadhaar } from "../utils/validators.js";
 
+/**
+ * Splits a full_name string into first_name and last_name.
+ * first_name = first word, last_name = remaining words (or null).
+ */
+const splitFullName = (fullName) => {
+    if (!fullName || typeof fullName !== 'string') return { first_name: '', last_name: null };
+    const trimmed = fullName.trim();
+    const spaceIndex = trimmed.indexOf(' ');
+    if (spaceIndex === -1) {
+        return { first_name: trimmed, last_name: null };
+    }
+    return {
+        first_name: trimmed.substring(0, spaceIndex),
+        last_name: trimmed.substring(spaceIndex + 1).trim() || null,
+    };
+};
+
 const validateConsumerData = (data) => {
     if (data.phone_primary) {
         const check = validateMobile(data.phone_primary, "Primary phone number");
@@ -40,6 +57,7 @@ export const getAllConsumers = async (req, res) => {
 
         let query = `
             SELECT c.*,
+                   TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) AS full_name,
                    ab.name AS area_block_name,
                    u.first_name AS creator_first_name,
                    u.last_name AS creator_last_name,
@@ -85,6 +103,7 @@ export const getConsumerById = async (req, res) => {
         const role = req.user?.role;
         const result = await pool.query(
             `SELECT c.*,
+                    TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) AS full_name,
               ab.id AS area_block_id,
               ab.name AS area_block_name,
               u.first_name AS creator_first_name,
@@ -149,16 +168,21 @@ export const createConsumer = async (req, res) => {
             return res.status(400).json({ error: valError });
         }
 
+        // Split full_name into first_name and last_name
+        const { first_name, last_name } = splitFullName(full_name);
+
         const effectiveCreatedBy = created_by || req.user?.userId || req.user?.id || 1;
 
         const result = await pool.query(
             `WITH inserted_consumer AS (
-                INSERT INTO consumers (full_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, is_active)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23, TRUE)
+                INSERT INTO consumers (first_name, last_name, address, area_block_id, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, created_by, is_active)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24, TRUE)
                 RETURNING *
             )
             SELECT i.id,
-                   i.full_name,
+                   i.first_name,
+                   i.last_name,
+                   TRIM(CONCAT(i.first_name, ' ', COALESCE(i.last_name, ''))) AS full_name,
                    i.address,
                    ab.id AS area_block_id,
                    ab.name AS area_block_name,
@@ -190,7 +214,7 @@ export const createConsumer = async (req, res) => {
             FROM inserted_consumer i
             LEFT JOIN area_blocks ab ON i.area_block_id = ab.id
             LEFT JOIN users u ON i.created_by = u.id`,
-            [full_name, address, area_block_id || 1, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, effectiveCreatedBy]
+            [first_name, last_name, address, area_block_id || 1, email, phone_primary, phone_secondary, contact_person_name, contact_person_phone, contact_person_relation, same_as_contact_person, name_on_electric_bill, phone_on_electric_bill, geo_lat, geo_lng, electric_consumer_no, age, aadhaar_no, pan_no, bank_account_no, payment_mode, land_owned_by_consumer, occupation, effectiveCreatedBy]
         );
         res.status(200).json({
             data: result.rows[0]
@@ -235,43 +259,49 @@ export const updateConsumer = async (req, res) => {
             return res.status(400).json({ error: valError });
         }
 
+        // Split full_name into first_name and last_name
+        const { first_name, last_name } = splitFullName(full_name);
+
         const result = await pool.query(
             `WITH updated_consumer AS (
         UPDATE consumers
-        SET full_name = $1,
-            address = $2,
-            area_block_id = $3,
-            email = $4,
-            phone_primary = $5,
-            phone_secondary = $6,
-            contact_person_name = $7,
-            contact_person_phone = $8,
-            contact_person_relation = $9,
-            same_as_contact_person = $10,
-            name_on_electric_bill = $11,
-            phone_on_electric_bill = $12,
-            geo_lat = $13,
-            geo_lng = $14,
-            electric_consumer_no = $15,
-            age = $16,
-            aadhaar_no = $17,
-            pan_no = $18,
-            bank_account_no = $19,
-            payment_mode = $20,
-            land_owned_by_consumer = $21,
-            occupation = $22,
+        SET first_name = $1,
+            last_name = $2,
+            address = $3,
+            area_block_id = $4,
+            email = $5,
+            phone_primary = $6,
+            phone_secondary = $7,
+            contact_person_name = $8,
+            contact_person_phone = $9,
+            contact_person_relation = $10,
+            same_as_contact_person = $11,
+            name_on_electric_bill = $12,
+            phone_on_electric_bill = $13,
+            geo_lat = $14,
+            geo_lng = $15,
+            electric_consumer_no = $16,
+            age = $17,
+            aadhaar_no = $18,
+            pan_no = $19,
+            bank_account_no = $20,
+            payment_mode = $21,
+            land_owned_by_consumer = $22,
+            occupation = $23,
             updated_at = NOW()
-        WHERE id = $23
+        WHERE id = $24
         RETURNING *
       )
       SELECT u.*,
+             TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS full_name,
              ab.id AS area_block_id,
              ab.name AS area_block_name
       FROM updated_consumer u
       LEFT JOIN area_blocks ab
         ON u.area_block_id = ab.id`,
             [
-                full_name,
+                first_name,
+                last_name,
                 address,
                 area_block_id || 1,
                 email,
@@ -312,7 +342,7 @@ export const deactivateConsumer = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "UPDATE consumers SET is_active = FALSE, updated_at = NOW() WHERE id = $1 RETURNING id, full_name, is_active",
+            "UPDATE consumers SET is_active = FALSE, updated_at = NOW() WHERE id = $1 RETURNING id, first_name, last_name, is_active",
             [id]
         );
         if (result.rowCount === 0) {
@@ -332,7 +362,7 @@ export const activateConsumer = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "UPDATE consumers SET is_active = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, full_name, is_active",
+            "UPDATE consumers SET is_active = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, first_name, last_name, is_active",
             [id]
         );
         if (result.rowCount === 0) {

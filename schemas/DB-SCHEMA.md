@@ -122,7 +122,8 @@ erDiagram
 
     consumers {
         bigint id PK
-        text full_name
+        text first_name
+        text last_name
         text address
         bigint area_block_id FK "-> area_blocks.id"
         citext email
@@ -559,7 +560,8 @@ CREATE TABLE consumers (
   id                       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
   -- (1) basic identity
-  full_name                TEXT NOT NULL,
+  first_name               TEXT NOT NULL,
+  last_name                TEXT,
   -- (2) address: free text + dropdown block
   address                  TEXT NOT NULL,
   area_block_id            BIGINT NOT NULL REFERENCES area_blocks(id),

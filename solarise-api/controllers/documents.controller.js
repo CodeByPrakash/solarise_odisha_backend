@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 import { notifyUsers } from "../utils/notificationHelper.js";
-import { deleteFileFromS3, uploadFileToS3 } from "../services/s3Storage.js";
+import { deleteFileFromS3, getPresignedDownloadUrl, uploadFileToS3 } from "../services/s3Storage.js";
 
 // GET /api/documents - List all documents (filtered by role)
 export const getAllDocuments = async (req, res) => {
@@ -84,7 +84,56 @@ export const getDocumentById = async (req, res) => {
             return res.status(404).json({ error: "Document not found" });
         }
 
-        res.status(200).json({ data: result.rows[0] });
+        const doc = result.rows[0];
+
+        // Attempt to create a pre-signed S3 URL for secure direct previewing/downloading
+        let download_url = doc.file_url;
+        try {
+            const presigned = await getPresignedDownloadUrl(doc.file_url, 3600);
+            if (presigned) {
+                download_url = presigned;
+            }
+        } catch {
+            // Keep original file_url if S3 presigner is unconfigured or file is external
+        }
+
+        res.status(200).json({ data: { ...doc, download_url } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// GET /api/documents/:id/download-url - Get temporary secure signed download URL
+export const getDocumentDownloadUrl = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "SELECT id, consumer_id, doc_type, file_url, file_name, mime_type FROM documents WHERE id = $1",
+            [id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Document not found" });
+        }
+
+        const doc = result.rows[0];
+        let presignedUrl = doc.file_url;
+        try {
+            const signed = await getPresignedDownloadUrl(doc.file_url, 3600);
+            if (signed) presignedUrl = signed;
+        } catch (e) {
+            console.warn("Could not generate presigned S3 URL, returning direct URL:", e.message);
+        }
+
+        res.status(200).json({
+            data: {
+                id: doc.id,
+                file_url: doc.file_url,
+                download_url: presignedUrl,
+                file_name: doc.file_name,
+                mime_type: doc.mime_type,
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -127,14 +176,15 @@ export const getDocumentsByConsumer = async (req, res) => {
 export const createDocument = async (req, res) => {
     try {
         const { consumer_id, doc_type, file_url, file_name, mime_type, geo_lat, geo_lng, uploaded_by } = req.body;
-        if (!consumer_id || !doc_type || !file_url || !uploaded_by) {
+        const finalUploadedBy = uploaded_by || req.user?.userId || req.user?.id;
+        if (!consumer_id || !doc_type || !file_url || !finalUploadedBy) {
             return res.status(400).json({ error: "consumer_id, doc_type, file_url, and uploaded_by are required" });
         }
         const result = await pool.query(`
             INSERT INTO documents (consumer_id, doc_type, file_url, file_name, mime_type, geo_lat, geo_lng, uploaded_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-        `, [consumer_id, doc_type, file_url, file_name || null, mime_type || null, geo_lat || null, geo_lng || null, uploaded_by]);
+        `, [consumer_id, doc_type, file_url, file_name || null, mime_type || null, geo_lat || null, geo_lng || null, finalUploadedBy]);
         res.status(201).json({ data: result.rows[0] });
     } catch (err) {
         if (err.code === "23503") {
@@ -147,7 +197,7 @@ export const createDocument = async (req, res) => {
 export const verifyDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const { verified_by } = req.body;
+        const verified_by = req.body.verified_by || req.user?.userId || req.user?.id;
         if (!verified_by) {
             return res.status(400).json({ error: "verified_by (user ID) is required" });
         }
@@ -158,7 +208,6 @@ export const verifyDocument = async (req, res) => {
             RETURNING *
         `, [verified_by, id]);
         if (result.rowCount === 0) {
-            // Check if the doc exists at all
             const check = await pool.query("SELECT id, status FROM documents WHERE id = $1", [id]);
             if (check.rowCount === 0) {
                 return res.status(404).json({ error: "Document not found" });
@@ -183,7 +232,8 @@ export const verifyDocument = async (req, res) => {
 export const rejectDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const { verified_by, reject_reason } = req.body;
+        const verified_by = req.body.verified_by || req.user?.userId || req.user?.id;
+        const { reject_reason } = req.body;
         if (!verified_by) {
             return res.status(400).json({ error: "verified_by (user ID) is required" });
         }
@@ -220,14 +270,23 @@ export const rejectDocument = async (req, res) => {
 
 export const reuploadDocument = async (req, res) => {
     const client = await pool.connect();
+    let uploadedObject = null;
     try {
         const { id } = req.params;
-        const { file_url, file_name, mime_type, geo_lat, geo_lng, uploaded_by } = req.body;
-        if (!file_url || !uploaded_by) {
-            return res.status(400).json({ error: "file_url and uploaded_by are required" });
+        const uploaded_by = req.user?.userId || req.user?.id || req.body.uploaded_by;
+        let file_url = req.body.file_url;
+        let file_name = req.body.file_name;
+        let mime_type = req.body.mime_type;
+        const geo_lat = req.body.geo_lat;
+        const geo_lng = req.body.geo_lng;
+
+        if (!uploaded_by) {
+            return res.status(400).json({ error: "Authenticated uploader or uploaded_by is required" });
         }
+
         await client.query("BEGIN");
-        // Step 1: Get the original document's consumer_id and doc_type
+
+        // Step 1: Get original document
         const original = await client.query(
             "SELECT consumer_id, doc_type FROM documents WHERE id = $1",
             [id]
@@ -237,25 +296,58 @@ export const reuploadDocument = async (req, res) => {
             return res.status(404).json({ error: "Original document not found" });
         }
         const { consumer_id, doc_type } = original.rows[0];
+
+        // If a file is uploaded via multipart/form-data
+        if (req.file) {
+            uploadedObject = await uploadFileToS3({
+                file: req.file,
+                consumerId: consumer_id,
+                documentType: doc_type,
+            });
+            file_url = uploadedObject.url;
+            file_name = file_name || req.file.originalname;
+            mime_type = req.file.mimetype;
+        }
+
+        if (!file_url) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "Either a file or file_url is required for re-upload" });
+        }
+
         // Step 2: Get current max version for this consumer + doc_type
         const versionResult = await client.query(
             "SELECT COALESCE(MAX(version), 0) AS max_version FROM documents WHERE consumer_id = $1 AND doc_type = $2",
             [consumer_id, doc_type]
         );
-        const newVersion = versionResult.rows[0].max_version + 1;
+        const newVersion = Number(versionResult.rows[0].max_version) + 1;
+
         // Step 3: Insert new version
         const insertResult = await client.query(`
             INSERT INTO documents (consumer_id, doc_type, file_url, file_name, mime_type, geo_lat, geo_lng, uploaded_by, version)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
         `, [consumer_id, doc_type, file_url, file_name || null, mime_type || null, geo_lat || null, geo_lng || null, uploaded_by, newVersion]);
+        
         await client.query("COMMIT");
+
+        try {
+            notifyUsers({
+                targetRoles: ['admin', 'doc_team', 'site_manager'],
+                userId: uploaded_by,
+                title: `Document Re-uploaded (v${newVersion})`,
+                body: `New version uploaded for ${doc_type?.replace(/_/g, ' ')}.`
+            });
+        } catch { /* ignore notification errors */ }
+
         res.status(201).json({
             message: `Document re-uploaded as version ${newVersion}`,
             data: insertResult.rows[0]
         });
     } catch (err) {
         await client.query("ROLLBACK");
+        if (uploadedObject?.key) {
+            await deleteFileFromS3(uploadedObject.key).catch(() => {});
+        }
         res.status(500).json({ error: err.message });
     } finally {
         client.release();
@@ -417,7 +509,7 @@ export const uploadDocument = async (req, res) => {
     let uploadedObject;
     try {
         const { consumer_id, doc_type, file_name, geo_lat, geo_lng } = req.body;
-        const uploaded_by = req.user?.userId || req.user?.id;
+        const uploaded_by = req.user?.userId || req.user?.id || req.body.uploaded_by;
         if (!consumer_id || !doc_type || !req.file || !uploaded_by) {
             return res.status(400).json({ error: "consumer_id, doc_type, file, and an authenticated uploader are required" });
         }

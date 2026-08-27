@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
     getAllDocuments,
     getDocumentById,
+    getDocumentDownloadUrl,
     getDocumentsByConsumer,
     createDocument,
     uploadDocument,
@@ -64,6 +65,24 @@ router.get("/", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 
  *         description: List of documents for the consumer
  */
 router.get("/consumer/:consumerId", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getDocumentsByConsumer);
+
+/**
+ * @swagger
+ * /api/documents/{id}/download-url:
+ *   get:
+ *     summary: Get temporary pre-signed S3 download URL
+ *     tags: [Documents]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Presigned S3 URL
+ */
+router.get("/:id/download-url", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getDocumentDownloadUrl);
 
 /**
  * @swagger
@@ -160,7 +179,7 @@ router.patch("/:id/reject", authenticateToken, authorizeRoles('admin', 'doc_team
  * @swagger
  * /api/documents/{id}/reupload:
  *   post:
- *     summary: Re-upload a rejected document
+ *     summary: Re-upload a rejected document (supports multipart file or file_url)
  *     tags: [Documents]
  *     parameters:
  *       - in: path
@@ -171,17 +190,18 @@ router.patch("/:id/reject", authenticateToken, authorizeRoles('admin', 'doc_team
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               file_url:
+ *               file:
  *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Document re-uploaded
  */
-router.post("/:id/reupload", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), reuploadDocument);
+router.post("/:id/reupload", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), documentUpload.single("file"), reuploadDocument);
 router.post("/:id/flag", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), flagDocument);
 router.patch("/:id/flag", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager'), flagDocument);
 

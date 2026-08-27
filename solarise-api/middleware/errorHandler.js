@@ -36,7 +36,7 @@ const errorHandler = (err, req, res, next) => {
                     constraint: err.constraint || null,
                 });
 
-            // NOT NULL violation (e.g. missing required fields like full_name, phone_primary)
+            // NOT NULL violation (e.g. missing required fields like first_name, phone_primary)
             case "23502":
                 return res.status(400).json({
                     success: false,

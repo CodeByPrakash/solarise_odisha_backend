@@ -67,6 +67,7 @@ router.get("/:id", authenticateToken, authorizeRoles('agent', 'admin', 'site_man
  *             properties:
  *               full_name:
  *                 type: string
+ *                 description: Full name (split into first_name + last_name in backend)
  *               phone:
  *                 type: string
  *               email:
@@ -102,6 +103,7 @@ router.post("/", authenticateToken, authorizeRoles('agent', 'admin', 'site_manag
  *             properties:
  *               full_name:
  *                 type: string
+ *                 description: Full name (split into first_name + last_name in backend)
  *               phone:
  *                 type: string
  *               address:

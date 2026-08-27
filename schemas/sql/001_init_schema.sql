@@ -175,7 +175,8 @@ CREATE TABLE area_blocks (
 
 CREATE TABLE consumers (
   id                       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  full_name                TEXT NOT NULL,
+  first_name               TEXT NOT NULL,
+  last_name                TEXT,
   address                  TEXT NOT NULL,
   area_block_id            BIGINT NOT NULL REFERENCES area_blocks(id),
   email                    CITEXT,

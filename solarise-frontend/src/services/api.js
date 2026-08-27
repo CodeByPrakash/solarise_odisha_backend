@@ -139,6 +139,7 @@ export const documentService = {
   verify: (id, data) => api.patch(`/documents/${id}/verify`, data),
   reject: (id, data) => api.patch(`/documents/${id}/reject`, data),
   reupload: (id, data) => api.post(`/documents/${id}/reupload`, data),
+  getDownloadUrl: (id) => api.get(`/documents/${id}/download-url`),
   flag: (id, data) => api.post(`/documents/${id}/flag`, data),
 };
 

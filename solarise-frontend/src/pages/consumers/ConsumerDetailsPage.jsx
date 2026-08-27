@@ -601,21 +601,33 @@ const ConsumerDetailsPage = () => {
 
       {/* Uploaded Documents Grid */}
       <div className="bg-white p-6 sm:p-8 rounded-[28px] shadow-sm border border-slate-200/80 space-y-4">
-        <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2 border-b border-slate-100 pb-3">
-          <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span>Uploaded Verification Documents ({documents.length})</span>
-        </h2>
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2">
+            <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Uploaded Verification Documents ({documents.length})</span>
+          </h2>
+          <button
+            onClick={() => navigate('/documents/upload')}
+            className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition"
+          >
+            + Upload Document
+          </button>
+        </div>
 
         {documents.length === 0 ? (
           <p className="text-xs text-slate-400 italic">No uploaded documents recorded for this consumer yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {documents.map((doc) => (
-              <div key={doc.id} className="p-4 bg-slate-50 rounded-[20px] border border-slate-200/80 text-xs space-y-2">
+              <div
+                key={doc.id}
+                onClick={() => navigate(`/documents/${doc.id}`)}
+                className="p-4 bg-slate-50 hover:bg-slate-100/80 cursor-pointer transition rounded-[20px] border border-slate-200/80 text-xs space-y-2 group"
+              >
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-900 capitalize font-mono text-[11px]">
+                  <span className="font-bold text-slate-900 capitalize font-mono text-[11px] group-hover:text-emerald-700 transition">
                     {(doc.doc_type || '').replace(/_/g, ' ')}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold capitalize ${doc.status === 'verified' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -623,8 +635,11 @@ const ConsumerDetailsPage = () => {
                     {doc.status}
                   </span>
                 </div>
-                <p className="text-slate-500 font-mono text-[10px] truncate">{doc.file_url || doc.file_name || 'Document File'}</p>
-                <p className="text-slate-400 text-[10px]">Uploaded: {new Date(doc.uploaded_at || Date.now()).toLocaleDateString()}</p>
+                <p className="text-slate-500 font-mono text-[10px] truncate">{doc.file_name || doc.file_url || 'Document File'}</p>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                  <span>v{doc.version || 1}</span>
+                  <span>{new Date(doc.uploaded_at || Date.now()).toLocaleDateString()}</span>
+                </div>
               </div>
             ))}
           </div>
