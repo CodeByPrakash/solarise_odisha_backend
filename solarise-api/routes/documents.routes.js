@@ -3,6 +3,7 @@ import {
     getAllDocuments,
     getDocumentById,
     getDocumentDownloadUrl,
+    previewDocument,
     getDocumentsByConsumer,
     createDocument,
     uploadDocument,
@@ -98,6 +99,7 @@ router.get("/consumer/:consumerId", authenticateToken, authorizeRoles('agent', '
  *         description: Presigned S3 URL
  */
 router.get("/:id/download-url", authenticateToken, authorizeRoles('agent', 'admin', 'doc_team', 'site_manager', 'accounts'), getDocumentDownloadUrl);
+router.get("/:id/preview", previewDocument);
 
 /**
  * @swagger

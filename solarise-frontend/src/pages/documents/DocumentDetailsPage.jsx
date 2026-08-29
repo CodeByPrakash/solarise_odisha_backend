@@ -165,7 +165,7 @@ const DocumentDetailsPage = () => {
     );
   }
 
-  const fileUrl = document.download_url || document.file_url;
+  const fileUrl = document.download_url || (document.id ? `http://localhost:5000/api/documents/${document.id}/preview` : document.file_url);
   const isImage = (document.mime_type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(document.file_url || ''));
   const isPdf = (document.mime_type === 'application/pdf' || /\.pdf$/i.test(document.file_url || ''));
 

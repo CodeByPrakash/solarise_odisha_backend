@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 import { notifyUsers } from "../utils/notificationHelper.js";
-import { attachPresignedUrls, checkS3Health, deleteFileFromS3, getPresignedDownloadUrl, uploadFileToS3 } from "../services/s3Storage.js";
+import { attachPresignedUrls, checkS3Health, deleteFileFromS3, getFileStreamFromS3, getPresignedDownloadUrl, uploadFileToS3 } from "../services/s3Storage.js";
 
 // GET /api/documents - List all documents (filtered by role)
 export const getAllDocuments = async (req, res) => {
@@ -127,6 +127,47 @@ export const getDocumentDownloadUrl = async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+// GET /api/documents/:id/preview - Stream document file directly from S3 through backend
+export const previewDocument = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "SELECT id, file_url, file_name, mime_type FROM documents WHERE id = $1",
+            [id]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Document not found" });
+        }
+
+        const doc = result.rows[0];
+
+        try {
+            const { stream, contentType, contentLength } = await getFileStreamFromS3(doc.file_url);
+            
+            res.setHeader("Content-Type", contentType || doc.mime_type || "application/octet-stream");
+            if (contentLength) {
+                res.setHeader("Content-Length", contentLength);
+            }
+            res.setHeader(
+                "Content-Disposition",
+                `inline; filename="${encodeURIComponent(doc.file_name || 'document')}"`
+            );
+            
+            stream.pipe(res);
+        } catch (s3Err) {
+            const presigned = await getPresignedDownloadUrl(doc.file_url, 3600);
+            if (presigned) {
+                return res.redirect(presigned);
+            }
+            throw s3Err;
+        }
+    } catch (err) {
+        console.error("Preview document error:", err);
+        res.status(500).json({ error: err.message || "Failed to retrieve document stream" });
     }
 };
 

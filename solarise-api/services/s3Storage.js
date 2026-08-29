@@ -163,6 +163,26 @@ export const attachPresignedUrls = async (docs, expiresInSeconds = 3600) => {
     return isArray ? enriched : enriched[0];
 };
 
+export const getFileStreamFromS3 = async (keyOrUrl) => {
+    const key = extractS3Key(keyOrUrl);
+    if (!key) throw new Error("Invalid S3 key");
+
+    const { bucket } = getConfig();
+    const client = getS3Client();
+
+    const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+    });
+
+    const response = await client.send(command);
+    return {
+        stream: response.Body,
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+    };
+};
+
 export const checkS3Health = async () => {
     const { bucket, region } = getConfig();
     const client = getS3Client();
