@@ -1,22 +1,7 @@
 import axios from 'axios';
 
-// Dynamically determine base URL so Wi-Fi IP access works automatically on mobile/other devices
-const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-    const hostname = window.location.hostname;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      if (envUrl) {
-        return envUrl.replace('localhost', hostname).replace('127.0.0.1', hostname);
-      }
-      return `http://${hostname}:5000/api`;
-    }
-  }
-  return envUrl || 'http://localhost:5000/api';
-};
-
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
 });
 
 // Request interceptor to add auth token (if available)

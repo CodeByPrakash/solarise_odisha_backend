@@ -11,9 +11,11 @@ const pool = new pg.Pool({
     connectionTimeoutMillis: 10000
 });
 
-pool.on('connect', () => {
+pool.on('connect', (client) => {
+    client.query('SET search_path TO solarise, public');
     console.log('Connected to the database');
 });
+
 pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);
