@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 import { notifyUsers } from "../utils/notificationHelper.js";
-import { deleteFileFromS3, getPresignedDownloadUrl, uploadFileToS3 } from "../services/s3Storage.js";
+import { attachPresignedUrls, checkS3Health, deleteFileFromS3, getPresignedDownloadUrl, uploadFileToS3 } from "../services/s3Storage.js";
 
 // GET /api/documents - List all documents (filtered by role)
 export const getAllDocuments = async (req, res) => {
@@ -43,7 +43,8 @@ export const getAllDocuments = async (req, res) => {
         query += ` ORDER BY d.uploaded_at DESC`;
 
         const result = await pool.query(query, params);
-        res.status(200).json({ count: result.rowCount, data: result.rows });
+        const enrichedRows = await attachPresignedUrls(result.rows);
+        res.status(200).json({ count: result.rowCount, data: enrichedRows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -85,19 +86,9 @@ export const getDocumentById = async (req, res) => {
         }
 
         const doc = result.rows[0];
+        const enrichedDoc = await attachPresignedUrls(doc);
 
-        // Attempt to create a pre-signed S3 URL for secure direct previewing/downloading
-        let download_url = doc.file_url;
-        try {
-            const presigned = await getPresignedDownloadUrl(doc.file_url, 3600);
-            if (presigned) {
-                download_url = presigned;
-            }
-        } catch {
-            // Keep original file_url if S3 presigner is unconfigured or file is external
-        }
-
-        res.status(200).json({ data: { ...doc, download_url } });
+        res.status(200).json({ data: enrichedDoc });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -167,7 +158,8 @@ export const getDocumentsByConsumer = async (req, res) => {
             WHERE d.consumer_id = $1
             ORDER BY d.doc_type, d.version DESC
         `, [consumerId]);
-        res.status(200).json({ count: result.rowCount, data: result.rows });
+        const enrichedRows = await attachPresignedUrls(result.rows);
+        res.status(200).json({ count: result.rowCount, data: enrichedRows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -185,7 +177,8 @@ export const createDocument = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `, [consumer_id, doc_type, file_url, file_name || null, mime_type || null, geo_lat || null, geo_lng || null, finalUploadedBy]);
-        res.status(201).json({ data: result.rows[0] });
+        const enrichedDoc = await attachPresignedUrls(result.rows[0]);
+        res.status(201).json({ data: enrichedDoc });
     } catch (err) {
         if (err.code === "23503") {
             return res.status(400).json({ error: "Referenced consumer or user does not exist" });
@@ -339,9 +332,10 @@ export const reuploadDocument = async (req, res) => {
             });
         } catch { /* ignore notification errors */ }
 
+        const enrichedDoc = await attachPresignedUrls(insertResult.rows[0]);
         res.status(201).json({
             message: `Document re-uploaded as version ${newVersion}`,
-            data: insertResult.rows[0]
+            data: enrichedDoc
         });
     } catch (err) {
         await client.query("ROLLBACK");
@@ -521,10 +515,26 @@ export const uploadDocument = async (req, res) => {
             RETURNING *
         `, [consumer_id, doc_type, uploadedObject.url, file_name || req.file.originalname, req.file.mimetype, geo_lat || null, geo_lng || null, uploaded_by]);
 
-        res.status(201).json({ data: result.rows[0] });
+        const docRow = result.rows[0];
+        const enrichedDoc = await attachPresignedUrls(docRow);
+        res.status(201).json({ data: enrichedDoc });
     } catch (err) {
         if (uploadedObject?.key) await deleteFileFromS3(uploadedObject.key).catch(() => {});
         if (err.code === "23503") return res.status(400).json({ error: "Referenced consumer or authenticated user does not exist" });
         res.status(400).json({ error: err.message || "File upload failed" });
+    }
+};
+
+export const getS3Health = async (req, res) => {
+    try {
+        const health = await checkS3Health();
+        res.status(200).json({ success: true, ...health });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message,
+            code: err.name || err.Code,
+            tip: "Verify AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and AWS_S3_BUCKET in your .env file.",
+        });
     }
 };

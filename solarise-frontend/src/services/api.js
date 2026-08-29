@@ -119,6 +119,7 @@ export const documentService = {
   getById: (id) => api.get(`/documents/${id}`),
   getByConsumer: (consumerId) => api.get(`/documents/consumer/${consumerId}`),
   getStatusSummary: () => api.get('/documents/status-summary'),
+  checkS3Health: () => api.get('/documents/s3-health'),
   create: (data) => api.post('/documents', data),
   upload: (data) => api.post('/documents/upload', data),
   verify: (id, data) => api.patch(`/documents/${id}/verify`, data),

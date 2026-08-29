@@ -11,6 +11,7 @@ import {
     reuploadDocument,
     flagDocument,
     getDocumentStatusSummary,
+    getS3Health,
 } from "../controllers/documents.controller.js";
 import { authenticateToken, authorizeRoles } from "../middleware/auth.middleware.js";
 import { documentUpload } from "../middleware/upload.middleware.js";
@@ -23,6 +24,20 @@ const router = Router();
  *   name: Documents
  *   description: Document upload, verification & management
  */
+
+/**
+ * @swagger
+ * /api/documents/s3-health:
+ *   get:
+ *     summary: Test connection and permissions to AWS S3 bucket
+ *     tags: [Documents]
+ *     responses:
+ *       200:
+ *         description: Connected to S3
+ *       500:
+ *         description: S3 connection or credential error
+ */
+router.get("/s3-health", authenticateToken, authorizeRoles('admin', 'doc_team', 'agent', 'site_manager', 'accounts'), getS3Health);
 
 /**
  * @swagger

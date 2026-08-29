@@ -5,12 +5,33 @@ import path from "node:path";
 
 let s3ClientInstance = null;
 
+const cleanEnv = (val) => {
+    if (!val) return "";
+    return String(val).trim().replace(/^["']|["']$/g, "").trim();
+};
+
+export const getConfig = () => {
+    const region = cleanEnv(process.env.AWS_REGION) || "ap-south-2";
+    const bucket = cleanEnv(process.env.AWS_S3_BUCKET) || cleanEnv(process.env.AWS_BUCKET_NAME) || "solarise-odisha-storage";
+
+    if (!region || !bucket) {
+        throw new Error("AWS_REGION and AWS_S3_BUCKET must be configured for file uploads");
+    }
+
+    return { region, bucket };
+};
+
 export const getS3Client = () => {
     if (!s3ClientInstance) {
-        const region = process.env.AWS_REGION || "ap-south-2";
-        const credentials = (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ? {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID.trim(),
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY.trim(),
+        const { region } = getConfig();
+        const accessKeyId = cleanEnv(process.env.AWS_ACCESS_KEY_ID);
+        const secretAccessKey = cleanEnv(process.env.AWS_SECRET_ACCESS_KEY);
+        const sessionToken = cleanEnv(process.env.AWS_SESSION_TOKEN) || undefined;
+
+        const credentials = (accessKeyId && secretAccessKey) ? {
+            accessKeyId,
+            secretAccessKey,
+            ...(sessionToken ? { sessionToken } : {}),
         } : undefined;
 
         s3ClientInstance = new S3Client({
@@ -21,17 +42,6 @@ export const getS3Client = () => {
     return s3ClientInstance;
 };
 
-export const getConfig = () => {
-    const region = process.env.AWS_REGION || "ap-south-2";
-    const bucket = process.env.AWS_S3_BUCKET || process.env.AWS_BUCKET_NAME || "solarise-odisha-storage";
-
-    if (!region || !bucket) {
-        throw new Error("AWS_REGION and AWS_S3_BUCKET must be configured for file uploads");
-    }
-
-    return { region, bucket };
-};
-
 export const extractS3Key = (keyOrUrl) => {
     if (!keyOrUrl) return null;
     if (!keyOrUrl.startsWith("http://") && !keyOrUrl.startsWith("https://")) {
@@ -39,8 +49,12 @@ export const extractS3Key = (keyOrUrl) => {
     }
     try {
         const parsed = new URL(keyOrUrl);
-        // Pathname starts with '/' e.g. /documents/1/electric_bill/uuid-file.jpg
-        return decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+        let pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+        const { bucket } = getConfig();
+        if (pathname.startsWith(`${bucket}/`)) {
+            pathname = pathname.substring(bucket.length + 1);
+        }
+        return pathname;
     } catch {
         return keyOrUrl;
     }
@@ -80,7 +94,7 @@ export const uploadFileToS3 = async ({ file, consumerId, documentType }) => {
         },
     }));
 
-    const publicBaseUrl = process.env.AWS_S3_PUBLIC_BASE_URL?.replace(/\/$/, "");
+    const publicBaseUrl = cleanEnv(process.env.AWS_S3_PUBLIC_BASE_URL)?.replace(/\/$/, "");
     const url = publicBaseUrl
         ? `${publicBaseUrl}/${key}`
         : `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
@@ -116,9 +130,37 @@ export const getPresignedDownloadUrl = async (keyOrUrl, expiresInSeconds = 3600)
     const command = new GetObjectCommand({
         Bucket: bucket,
         Key: key,
+        ResponseContentDisposition: "inline",
     });
 
     return await getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+};
+
+export const attachPresignedUrls = async (docs, expiresInSeconds = 3600) => {
+    if (!docs) return docs;
+    const isArray = Array.isArray(docs);
+    const list = isArray ? docs : [docs];
+
+    const enriched = await Promise.all(
+        list.map(async (doc) => {
+            if (!doc) return doc;
+            let download_url = doc.file_url;
+            if (doc.file_url) {
+                try {
+                    const signed = await getPresignedDownloadUrl(doc.file_url, expiresInSeconds);
+                    if (signed) download_url = signed;
+                } catch {
+                    // Keep original file_url if presigning is unavailable
+                }
+            }
+            return {
+                ...doc,
+                download_url,
+            };
+        })
+    );
+
+    return isArray ? enriched : enriched[0];
 };
 
 export const checkS3Health = async () => {
@@ -128,3 +170,4 @@ export const checkS3Health = async () => {
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
     return { status: "connected", bucket, region };
 };
+

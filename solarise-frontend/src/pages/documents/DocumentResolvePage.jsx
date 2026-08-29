@@ -467,7 +467,7 @@ const DocumentResolvePage = () => {
                 <div className="text-xs space-y-1 text-gray-700">
                   <p><span className="font-semibold text-gray-500">Version:</span> v{uploadedNewVersion?.version || (doc.version || 1) + 1}</p>
                   <p><span className="font-semibold text-gray-500">File:</span> <span className="font-mono text-[11px]">{uploadedNewVersion?.file_name || 'corrected'}</span></p>
-                  <a href={uploadedNewVersion?.file_url || '#'} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-mono text-[11px] block break-all">{uploadedNewVersion?.file_url || 'Uploaded'}</a>
+                  <a href={uploadedNewVersion?.download_url || uploadedNewVersion?.file_url || '#'} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-mono text-[11px] block break-all">{uploadedNewVersion?.file_name || uploadedNewVersion?.file_url || 'Uploaded'}</a>
                   {uploadedNewVersion?.geo_lat && <p className="font-mono text-amber-700">GPS: {uploadedNewVersion.geo_lat}, {uploadedNewVersion.geo_lng}</p>}
                 </div>
               </div>
