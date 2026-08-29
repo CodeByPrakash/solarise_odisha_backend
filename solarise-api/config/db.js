@@ -7,7 +7,8 @@ const pool = new pg.Pool({
     database: process.env.DB_NAME || "db_name",
     password: process.env.DB_PASSWORD || "your_password",
     port: process.env.DB_PORT || 'portno',
-    options: "-c search_path=solarise",
+    options: "-c search_path=solarise,public",
+    ssl: process.env.DB_SSL === 'true' || process.env.DB_HOST?.includes('neon.tech') ? { rejectUnauthorized: false } : false,
     max: 20, // Maximum connections in pool
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
