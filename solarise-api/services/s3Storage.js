@@ -5,6 +5,13 @@ import path from "node:path";
 
 let s3ClientInstance = null;
 
+console.log("AWS CONFIG:", {
+    accessKeyExists: !!process.env.AWS_ACCESS_KEY_ID,
+    secretKeyExists: !!process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+    bucket: process.env.AWS_S3_BUCKET
+});
+
 const cleanEnv = (val) => {
     if (!val) return "";
     return String(val).trim().replace(/^["']|["']$/g, "").trim();
