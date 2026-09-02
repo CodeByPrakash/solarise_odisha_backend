@@ -36,8 +36,8 @@ const UserProfilePage = () => {
   useEffect(() => {
     if (user) {
       setProfileForm({
-        first_name: user.first_name || (user.full_name ? user.full_name.split(' ')[0] : ''),
-        last_name: user.last_name || (user.full_name ? user.full_name.split(' ').slice(1).join(' ') : ''),
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
         email: user.email || '',
         phone: user.phone || user.phone_primary || '',
         role: user.role || 'agent',
@@ -175,14 +175,14 @@ const UserProfilePage = () => {
             {/* User Avatar Big */}
             <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-[24px] bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-1 shadow-md shrink-0">
               <div className="h-full w-full bg-white rounded-[20px] flex items-center justify-center font-black text-2xl sm:text-3xl text-emerald-700 font-mono shadow-inner">
-                {(user?.first_name || user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                {(user?.first_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
             </div>
 
             <div>
               <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {`${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.full_name || user?.name || 'Authorized User'}
+                  {`${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.name || 'Authorized User'}
                 </h1>
                 <span className={`px-3 py-1 text-[10px] font-mono font-extrabold uppercase rounded-full border ${roleColorBadge(user?.role)}`}>
                   {user?.role || 'Operator'}

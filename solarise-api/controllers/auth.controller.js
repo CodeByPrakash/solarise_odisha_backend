@@ -43,18 +43,17 @@ export const register = async (req, res) => {
 
         let { first_name, last_name, full_name, email, phone, role, password } = req.body;
 
-        // Support full_name string fallback
+        // Support full_name: split into first_name and last_name when provided as a single string
         if (!first_name && full_name) {
             const parts = full_name.trim().split(/\s+/);
             first_name = parts[0];
-            last_name = parts.slice(1).join(" ") || "User";
+            last_name = parts.slice(1).join(" ") || "";
         }
 
-
-
-        if (!first_name || !last_name || !email || !phone || !password) {
-            return res.status(400).json({ error: "first_name, last_name (or full_name), email, phone, and password are required" });
+        if (!first_name || !email || !phone || !password) {
+            return res.status(400).json({ error: "Name (first_name or full_name), email, phone, and password are required" });
         }
+        if (!last_name) last_name = "";
 
         const emailCheck = validateEmail(email);
         if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.error });

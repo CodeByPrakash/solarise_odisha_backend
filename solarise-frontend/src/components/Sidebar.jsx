@@ -15,8 +15,8 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
 
   const role = user?.role || 'agent';
-  const firstName = user?.first_name || (user?.full_name ? user.full_name.split(' ')[0] : '') || user?.firstName || 'User';
-  const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.full_name || user?.firstName || 'Authorized User';
+  const firstName = user?.first_name || user?.firstName || 'User';
+  const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.firstName || 'Authorized User';
   const firstLetter = (firstName || 'U').charAt(0).toUpperCase();
 
   const handleLogout = () => {
